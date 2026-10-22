@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#1f3d2b" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="description" content="AgriMan — track farm expenses, market sales, transport, and profit." />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" href="logo.jpg" type="image/jpeg" />
+    <link rel="apple-touch-icon" href="logo.jpg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Literata:opsz,wght@7..72,500;7..72,700&family=Manrope:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <title>AgriMan</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <div class="brand-block">
+          <img class="brand-logo" src="logo.jpg" width="48" height="48" alt="AgriMan" />
+          <div>
+            <p class="brand">AgriMan</p>
+            <p class="season-label" id="seasonLabel">—</p>
+          </div>
+        </div>
+        <div class="top-actions">
+          <div class="lang-switch" role="group" aria-label="Language">
+            <button type="button" class="lang-btn active" data-lang="en" id="langEn">EN</button>
+            <button type="button" class="lang-btn" data-lang="ar" id="langAr">ع</button>
+          </div>
+          <button type="button" class="icon-btn" id="aboutBtn" data-i18n-aria="about" aria-label="About">
+            i
+          </button>
+          <button type="button" class="icon-btn" id="settingsBtn" data-i18n-aria="settings" aria-label="Settings">
+            ⚙
+          </button>
+        </div>
+      </header>
+
+      <main id="views">
+        <!-- HOME / PROFIT -->
+        <section class="view active" data-view="home">
+          <div class="hero-summary">
+            <p class="eyebrow" data-i18n="seasonProfit">Season profit</p>
+            <p class="profit-figure" id="profitFigure">0</p>
+            <p class="profit-sub" id="profitSub" data-i18n="revenueMinusExpenses">Revenue − expenses</p>
+          </div>
+          <div class="stat-grid">
+            <article class="stat">
+              <h3 data-i18n="revenue">Revenue</h3>
+              <p id="totalRevenue">0</p>
+            </article>
+            <article class="stat">
+              <h3 data-i18n="expenses">Expenses</h3>
+              <p id="totalExpenses">0</p>
+            </article>
+            <article class="stat">
+              <h3 data-i18n="transport">Transport</h3>
+              <p id="totalTransport">0</p>
+            </article>
+            <article class="stat">
+              <h3 data-i18n="marketDays">Market days</h3>
+              <p id="marketDays">0</p>
+            </article>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h2 data-i18n="byCategory">By category</h2>
+            </div>
+            <ul class="category-list" id="categoryBreakdown"></ul>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h2 data-i18n="recentActivity">Recent activity</h2>
+            </div>
+            <ul class="activity-list" id="recentActivity"></ul>
+          </div>
+        </section>
+
+        <!-- EXPENSES -->
+        <section class="view" data-view="expenses">
+          <div class="panel">
+            <div class="panel-head">
+              <h2 data-i18n="addExpense">Add expense</h2>
+            </div>
+            <form id="expenseForm" class="form">
+              <label>
+                <span data-i18n="date">Date</span>
+                <input type="date" name="date" required />
+              </label>
+              <label>
+                <span data-i18n="category">Category</span>
+                <select name="category" required data-i18n-options="expenseCategories"></select>
+              </label>
+              <label>
+                <span data-i18n="amount">Amount</span>
+                <input type="number" name="amount" min="0" step="0.01" required placeholder="0.00" />
+              </label>
+              <label>
+                <span data-i18n="notes">Notes</span>
+                <input type="text" name="notes" data-i18n-placeholder="notesExpensePh" placeholder="" />
+              </label>
+              <button type="submit" class="primary-btn" data-i18n="saveExpense">Save expense</button>
+            </form>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h2 data-i18n="expenses">Expenses</h2>
+              <span class="muted" id="expenseCount">0</span>
+            </div>
+            <ul class="record-list" id="expenseList"></ul>
+          </div>
+        </section>
+
+        <!-- MARKET + TRANSPORT -->
+        <section class="view" data-view="market">
+          <div class="panel">
+            <div class="panel-head">
+              <h2 data-i18n="dailyMarketSale">Daily market sale</h2>
+            </div>
+            <form id="marketForm" class="form">
+              <label>
+                <span data-i18n="date">Date</span>
+                <input type="date" name="date" required />
+              </label>
+              <label>
+                <span data-i18n="product">Product</span>
+                <input type="text" name="product" required data-i18n-placeholder="productPh" placeholder="" />
+              </label>
+              <div class="row-2">
+                <label>
+                  <span data-i18n="quantity">Quantity</span>
+                  <input type="number" name="quantity" min="0" step="0.01" placeholder="0" />
+                </label>
+                <label>
+                  <span data-i18n="unit">Unit</span>
+                  <input type="text" name="unit" data-i18n-placeholder="unitPh" placeholder="" value="kg" />
+                </label>
+              </div>
+              <label>
+                <span data-i18n="saleAmount">Sale amount (revenue)</span>
+                <input type="number" name="revenue" min="0" step="0.01" required placeholder="0.00" />
+              </label>
+              <label>
+                <span data-i18n="transportFee">Transport fee</span>
+                <input type="number" name="transport" min="0" step="0.01" value="0" placeholder="0.00" />
+              </label>
+              <label>
+                <span data-i18n="marketBuyer">Market / buyer</span>
+                <input type="text" name="market" data-i18n-placeholder="marketPh" placeholder="" />
+              </label>
+              <label>
+                <span data-i18n="notes">Notes</span>
+                <input type="text" name="notes" data-i18n-placeholder="optional" placeholder="" />
+              </label>
+              <button type="submit" class="primary-btn" data-i18n="saveMarketDay">Save market day</button>
+            </form>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h2 data-i18n="marketTrips">Market trips</h2>
+              <span class="muted" id="marketCount">0</span>
+            </div>
+            <ul class="record-list" id="marketList"></ul>
+          </div>
+        </section>
+
+        <!-- CALENDAR -->
+        <section class="view" data-view="calendar">
+          <div class="panel">
+            <div class="panel-head calendar-nav">
+              <button type="button" class="icon-btn" id="prevMonth" data-i18n-aria="prevMonth" aria-label="Previous month">‹</button>
+              <h2 id="calendarTitle">Month</h2>
+              <button type="button" class="icon-btn" id="nextMonth" data-i18n-aria="nextMonth" aria-label="Next month">›</button>
+            </div>
+            <div class="calendar-legend">
+              <span><i class="dot expense"></i> <span data-i18n="expense">Expense</span></span>
+              <span><i class="dot revenue"></i> <span data-i18n="sale">Sale</span></span>
+              <span><i class="dot both"></i> <span data-i18n="both">Both</span></span>
+            </div>
+            <div class="calendar-grid" id="calendarGrid"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h2 id="dayTitle" data-i18n="selectDay">Select a day</h2>
+            </div>
+            <div class="day-summary" id="daySummary">
+              <p class="muted" data-i18n="tapDayHint">Tap a day to see what you paid and earned.</p>
+            </div>
+            <ul class="record-list" id="dayList"></ul>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h2 data-i18n="plannedPayments">Planned payments</h2>
+              <button type="button" class="text-btn" id="addPlanBtn" data-i18n="addPlan">+ Plan</button>
+            </div>
+            <p class="hint" data-i18n="planHint">Schedule expected costs through the season (rent, labor, water…).</p>
+            <ul class="record-list" id="planList"></ul>
+          </div>
+        </section>
+
+        <!-- ABOUT -->
+        <section class="view" data-view="about">
+          <div class="about-card">
+            <img class="about-logo" src="logo.jpg" width="96" height="96" alt="AgriMan" />
+            <h1>AgriMan</h1>
+            <p class="about-tagline" data-i18n="aboutTagline">
+              Your farm season ledger — costs, market days, transport, and profit in one place.
+            </p>
+            <dl class="about-meta">
+              <div>
+                <dt data-i18n="creator">Creator</dt>
+                <dd>Manaysah</dd>
+              </div>
+              <div>
+                <dt data-i18n="alias">Alias</dt>
+                <dd>Manaysah</dd>
+              </div>
+              <div>
+                <dt data-i18n="version">Version</dt>
+                <dd>1.1.0</dd>
+              </div>
+            </dl>
+            <p class="about-note" data-i18n="aboutNote">
+              Built to replace paper notes: log expenses and daily market sales, plan season payments on the calendar, and see profit clearly.
+            </p>
+            <button type="button" class="primary-btn" id="backFromAbout" data-i18n="backToProfit">Back to profit</button>
+          </div>
+        </section>
+      </main>
+
+      <nav class="bottom-nav" data-i18n-aria="mainNav" aria-label="Main">
+        <button type="button" class="nav-item active" data-nav="home">
+          <span>⌂</span>
+          <small data-i18n="navProfit">Profit</small>
+        </button>
+        <button type="button" class="nav-item" data-nav="expenses">
+          <span>−</span>
+          <small data-i18n="navExpenses">Expenses</small>
+        </button>
+        <button type="button" class="nav-item" data-nav="market">
+          <span>↗</span>
+          <small data-i18n="navMarket">Market</small>
+        </button>
+        <button type="button" class="nav-item" data-nav="calendar">
+          <span>▦</span>
+          <small data-i18n="navCalendar">Calendar</small>
+        </button>
+      </nav>
+    </div>
+
+    <!-- SETTINGS MODAL -->
+    <dialog id="settingsDialog">
+      <form method="dialog" id="settingsForm" class="form modal-form">
+        <h2 data-i18n="settings">Settings</h2>
+        <label>
+          <span data-i18n="language">Language</span>
+          <select name="language" id="settingsLanguage">
+            <option value="en">English</option>
+            <option value="ar">العربية</option>
+          </select>
+        </label>
+        <label>
+          <span data-i18n="seasonName">Season name</span>
+          <input type="text" name="seasonName" required data-i18n-placeholder="seasonPh" placeholder="" />
+        </label>
+        <label>
+          <span data-i18n="currencySymbol">Currency symbol</span>
+          <input type="text" name="currency" maxlength="4" placeholder="₪ / JD / $" />
+        </label>
+        <div class="modal-actions">
+          <button type="button" class="ghost-btn" id="exportBtn" data-i18n="exportBackup">Export backup</button>
+          <button type="button" class="ghost-btn danger" id="clearBtn" data-i18n="clearSeason">Clear season data</button>
+        </div>
+        <div class="modal-actions end">
+          <button type="submit" class="primary-btn" value="save" data-i18n="save">Save</button>
+          <button type="button" class="ghost-btn" id="closeSettings" data-i18n="close">Close</button>
+        </div>
+        <p class="hint" data-i18n="settingsHint">
+          Data stays on this phone/browser. Export a backup before switching devices.
+        </p>
+      </form>
+    </dialog>
+
+    <!-- PLAN MODAL -->
+    <dialog id="planDialog">
+      <form id="planForm" class="form modal-form">
+        <h2 data-i18n="plannedPayment">Planned payment</h2>
+        <label>
+          <span data-i18n="dueDate">Due date</span>
+          <input type="date" name="date" required />
+        </label>
+        <label>
+          <span data-i18n="category">Category</span>
+          <select name="category" required data-i18n-options="planCategories"></select>
+        </label>
+        <label>
+          <span data-i18n="expectedAmount">Expected amount</span>
+          <input type="number" name="amount" min="0" step="0.01" required />
+        </label>
+        <label>
+          <span data-i18n="notes">Notes</span>
+          <input type="text" name="notes" data-i18n-placeholder="optional" placeholder="" />
+        </label>
+        <div class="modal-actions end">
+          <button type="submit" class="primary-btn" data-i18n="savePlan">Save plan</button>
+          <button type="button" class="ghost-btn" id="closePlan" data-i18n="cancel">Cancel</button>
+        </div>
+      </form>
+    </dialog>
+
+    <input type="file" id="importFile" accept="application/json" hidden />
+    <script src="app.js"></script>
+  </body>
+</html>

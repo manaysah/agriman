@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Farm Ledger">
+  <rect width="128" height="128" rx="28" fill="#1f3d2b"/>
+  <path d="M64 22c18 14 28 28 28 46 0 18-12 32-28 38-16-6-28-20-28-38 0-18 10-32 28-46z" fill="#c4a35a"/>
+  <path d="M64 48c8 8 12 16 12 26s-5 18-12 22c-7-4-12-12-12-22s4-18 12-26z" fill="#2f5a3d"/>
+  <rect x="60" y="88" width="8" height="22" rx="4" fill="#f3efe6"/>
+</svg>
