@@ -1,6 +1,8 @@
 (() => {
   const STORAGE_KEY = "agriman-v1";
   const LEGACY_KEY = "farm-ledger-v1";
+  const SESSION_KEY = "agriman-session-v1";
+  const LOCAL_ONLY_KEY = "agriman-local-only";
 
   const EXPENSE_CATEGORY_KEYS = [
     "land",
@@ -105,6 +107,32 @@
       spring: "Spring",
       summer: "Summer",
       fall: "Fall",
+      authTagline: "Shared farm ledger — Farm ID + password, synced safely in the cloud.",
+      cloudSetupNeeded:
+        "Cloud sync is not configured yet. Follow SETUP-CLOUD.md to connect your free Supabase project, or continue on this device only.",
+      continueLocal: "Continue on this device only",
+      joinFarm: "Join farm",
+      createFarm: "Create farm",
+      farmId: "Farm ID",
+      password: "Password",
+      confirmPassword: "Confirm password",
+      createFarmHint: "We’ll generate a Farm ID. Share the ID and password with your partner.",
+      pleaseWait: "Please wait…",
+      yourFarmId: "Your Farm ID",
+      copyFarmId: "Copy Farm ID",
+      syncNow: "Sync now",
+      logout: "Log out",
+      logoutConfirm: "Log out on this device? Cloud data stays safe — use Farm ID + password to return.",
+      passwordMismatch: "Passwords do not match.",
+      syncOk: "Synced",
+      syncSaving: "Saving to cloud…",
+      syncError: "Cloud sync failed",
+      syncLocal: "This device only",
+      copied: "Copied",
+      authErrorGeneric: "Could not sign in. Check Farm ID and password.",
+      farmCreated: "Farm created. Share this Farm ID with your partner:",
+      settingsHint:
+        "Cloud farm data is shared with anyone who has your Farm ID and password. Export a backup as extra safety.",
       cats: {
         land: "Land / rent",
         seeds: "Seeds",
@@ -206,6 +234,32 @@
       spring: "ربيع",
       summer: "صيف",
       fall: "خريف",
+      authTagline: "دفتر مزرعة مشترك — معرّف المزرعة وكلمة المرور، بمزامنة آمنة في السحابة.",
+      cloudSetupNeeded:
+        "المزامنة السحابية غير مُعدّة بعد. اتبع SETUP-CLOUD.md لربط مشروع Supabase المجاني، أو تابع على هذا الجهاز فقط.",
+      continueLocal: "المتابعة على هذا الجهاز فقط",
+      joinFarm: "الانضمام للمزرعة",
+      createFarm: "إنشاء مزرعة",
+      farmId: "معرّف المزرعة",
+      password: "كلمة المرور",
+      confirmPassword: "تأكيد كلمة المرور",
+      createFarmHint: "سنُنشئ معرّف مزرعة. شاركه مع كلمة المرور مع شريكك.",
+      pleaseWait: "يرجى الانتظار…",
+      yourFarmId: "معرّف مزرعتك",
+      copyFarmId: "نسخ المعرّف",
+      syncNow: "مزامنة الآن",
+      logout: "تسجيل الخروج",
+      logoutConfirm: "تسجيل الخروج من هذا الجهاز؟ البيانات السحابية تبقى آمنة — استخدم المعرّف وكلمة المرور للعودة.",
+      passwordMismatch: "كلمتا المرور غير متطابقتين.",
+      syncOk: "تمت المزامنة",
+      syncSaving: "جاري الحفظ في السحابة…",
+      syncError: "فشلت مزامنة السحابة",
+      syncLocal: "هذا الجهاز فقط",
+      copied: "تم النسخ",
+      authErrorGeneric: "تعذر الدخول. تحقق من المعرّف وكلمة المرور.",
+      farmCreated: "تم إنشاء المزرعة. شارك هذا المعرّف مع شريكك:",
+      settingsHint:
+        "بيانات المزرعة السحابية متاحة لمن لديه المعرّف وكلمة المرور. صدّر نسخة احتياطية للأمان الإضافي.",
       cats: {
         land: "أرض / إيجار",
         seeds: "بذور",
@@ -289,10 +343,200 @@
 
   function saveState() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    scheduleCloudSave();
   }
 
   function uid() {
     return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+
+  function generateFarmId() {
+    const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let body = "";
+    const bytes = crypto.getRandomValues(new Uint8Array(6));
+    for (let i = 0; i < 6; i++) body += alphabet[bytes[i] % alphabet.length];
+    return `AM-${body}`;
+  }
+
+  function cloudConfigured() {
+    const cfg = window.AGRIMAN_CONFIG || {};
+    return Boolean(cfg.supabaseUrl && cfg.supabaseAnonKey && !cfg.supabaseUrl.includes("YOUR_PROJECT"));
+  }
+
+  function getSupabase() {
+    if (!cloudConfigured()) return null;
+    if (!window.__agrimanSb) {
+      const { createClient } = window.supabase;
+      const cfg = window.AGRIMAN_CONFIG;
+      window.__agrimanSb = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+    }
+    return window.__agrimanSb;
+  }
+
+  function loadSession() {
+    try {
+      return JSON.parse(localStorage.getItem(SESSION_KEY) || "null");
+    } catch {
+      return null;
+    }
+  }
+
+  function saveSession(session) {
+    if (!session) localStorage.removeItem(SESSION_KEY);
+    else localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  }
+
+  function isLocalOnly() {
+    return localStorage.getItem(LOCAL_ONLY_KEY) === "1";
+  }
+
+  function setLocalOnly(on) {
+    if (on) localStorage.setItem(LOCAL_ONLY_KEY, "1");
+    else localStorage.removeItem(LOCAL_ONLY_KEY);
+  }
+
+  function payloadFromState() {
+    return {
+      settings: state.settings,
+      expenses: state.expenses,
+      markets: state.markets,
+      plans: state.plans,
+    };
+  }
+
+  function applyCloudData(data) {
+    const base = defaultState();
+    const incoming = data && typeof data === "object" ? data : {};
+    state = {
+      ...base,
+      ...incoming,
+      settings: { ...base.settings, ...(incoming.settings || {}) },
+      expenses: incoming.expenses || [],
+      markets: incoming.markets || [],
+      plans: incoming.plans || [],
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function mapAuthError(err) {
+    const msg = String(err?.message || err || "");
+    if (msg.includes("BAD_LOGIN")) return t("authErrorGeneric");
+    if (msg.includes("FARM_EXISTS")) return "Farm ID already exists. Try again.";
+    if (msg.includes("WEAK_PASSWORD")) return "Password must be at least 6 characters.";
+    if (msg.includes("BAD_SESSION")) return t("authErrorGeneric");
+    if (msg.includes("INVALID_FARM_ID")) return "Invalid Farm ID.";
+    return t("authErrorGeneric");
+  }
+
+  function setSyncLabel(text, kind) {
+    const el = $("#syncLabel");
+    if (!el) return;
+    el.textContent = text || "";
+    el.dataset.kind = kind || "";
+  }
+
+  let saveTimer = null;
+  let cloudBusy = false;
+
+  function scheduleCloudSave() {
+    const session = loadSession();
+    if (!session?.token || !cloudConfigured()) return;
+    setSyncLabel(t("syncSaving"), "saving");
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      pushToCloud().catch(() => {});
+    }, 700);
+  }
+
+  async function pushToCloud() {
+    const session = loadSession();
+    const sb = getSupabase();
+    if (!session?.token || !sb) return false;
+    cloudBusy = true;
+    const { data, error } = await sb.rpc("save_farm", {
+      p_token: session.token,
+      p_data: payloadFromState(),
+    });
+    cloudBusy = false;
+    if (error) {
+      setSyncLabel(t("syncError"), "error");
+      return false;
+    }
+    if (data?.updated_at) {
+      session.updatedAt = data.updated_at;
+      saveSession(session);
+    }
+    setSyncLabel(`${t("syncOk")} · ${session.farmId}`, "ok");
+    return true;
+  }
+
+  async function pullFromCloud() {
+    const session = loadSession();
+    const sb = getSupabase();
+    if (!session?.token || !sb) return false;
+    const { data, error } = await sb.rpc("load_farm", { p_token: session.token });
+    if (error) {
+      if (String(error.message || "").includes("BAD_SESSION")) {
+        saveSession(null);
+        showAuthGate();
+      }
+      setSyncLabel(t("syncError"), "error");
+      return false;
+    }
+    applyCloudData(data.data);
+    session.updatedAt = data.updated_at;
+    session.farmId = data.farm_id;
+    saveSession(session);
+    setSyncLabel(`${t("syncOk")} · ${session.farmId}`, "ok");
+    applyI18n();
+    renderAll();
+    return true;
+  }
+
+  function showAuthGate() {
+    $("#authGate").classList.remove("hidden");
+    $("#app").classList.add("hidden");
+    const configured = cloudConfigured();
+    $("#authSetupWarn").classList.toggle("hidden", configured);
+    $("#authTabs").classList.toggle("hidden", !configured);
+    $("#joinFarmForm").classList.toggle("hidden", !configured);
+    $("#createFarmForm").classList.add("hidden");
+    if (configured) {
+      $$(".auth-tab").forEach((btn) => btn.classList.toggle("active", btn.dataset.authTab === "join"));
+    }
+    $("#authError").classList.add("hidden");
+    applyI18n();
+  }
+
+  function showAppShell() {
+    $("#authGate").classList.add("hidden");
+    $("#app").classList.remove("hidden");
+    const session = loadSession();
+    if (session?.farmId) setSyncLabel(`${t("syncOk")} · ${session.farmId}`, "ok");
+    else if (isLocalOnly()) setSyncLabel(t("syncLocal"), "local");
+    else setSyncLabel("", "");
+  }
+
+  function setAuthBusy(on) {
+    $("#authBusy").classList.toggle("hidden", !on);
+    ["#joinFarmForm button[type=submit]", "#createFarmForm button[type=submit]"].forEach((sel) => {
+      const btn = $(sel);
+      if (btn) btn.disabled = on;
+    });
+  }
+
+  function showAuthError(message) {
+    const el = $("#authError");
+    el.textContent = message;
+    el.classList.remove("hidden");
+  }
+
+  async function enterAppFromSession() {
+    showAppShell();
+    applyI18n();
+    fillDefaultDates();
+    renderAll();
+    if (loadSession()?.token) await pullFromCloud();
   }
 
   function todayISO() {
@@ -796,6 +1040,8 @@
     form.seasonName.value = state.settings.seasonName;
     form.currency.value = state.settings.currency;
     form.language.value = state.settings.language || "en";
+    const session = loadSession();
+    $("#settingsFarmId").textContent = session?.farmId || (isLocalOnly() ? t("syncLocal") : "—");
     $("#settingsDialog").showModal();
   });
 
@@ -817,6 +1063,32 @@
     setLanguage(e.target.value);
   });
 
+  $("#copyFarmIdBtn").addEventListener("click", async () => {
+    const session = loadSession();
+    if (!session?.farmId) return;
+    try {
+      await navigator.clipboard.writeText(session.farmId);
+      setSyncLabel(t("copied"), "ok");
+    } catch {
+      prompt(t("yourFarmId"), session.farmId);
+    }
+  });
+
+  $("#syncNowBtn").addEventListener("click", async () => {
+    if (!loadSession()?.token) return;
+    setSyncLabel(t("pleaseWait"), "saving");
+    await pullFromCloud();
+    await pushToCloud();
+  });
+
+  $("#logoutBtn").addEventListener("click", () => {
+    if (!confirm(t("logoutConfirm"))) return;
+    saveSession(null);
+    setLocalOnly(false);
+    $("#settingsDialog").close();
+    showAuthGate();
+  });
+
   $("#exportBtn").addEventListener("click", () => {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
@@ -836,6 +1108,90 @@
     applyI18n();
     renderAll();
     renderCalendar();
+  });
+
+  $$(".auth-tab").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      $$(".auth-tab").forEach((b) => b.classList.toggle("active", b === btn));
+      const create = btn.dataset.authTab === "create";
+      $("#joinFarmForm").classList.toggle("hidden", create);
+      $("#createFarmForm").classList.toggle("hidden", !create);
+      $("#authError").classList.add("hidden");
+    });
+  });
+
+  $("#continueLocalBtn").addEventListener("click", () => {
+    setLocalOnly(true);
+    saveSession(null);
+    enterAppFromSession();
+  });
+
+  $("#joinFarmForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    $("#authError").classList.add("hidden");
+    const sb = getSupabase();
+    if (!sb) return showAuthError(t("cloudSetupNeeded"));
+    const fd = new FormData(e.target);
+    setAuthBusy(true);
+    const { data, error } = await sb.rpc("login_farm", {
+      p_farm_id: String(fd.get("farmId") || "").trim(),
+      p_password: String(fd.get("password") || ""),
+    });
+    setAuthBusy(false);
+    if (error) return showAuthError(mapAuthError(error));
+    setLocalOnly(false);
+    saveSession({ farmId: data.farm_id, token: data.token, updatedAt: data.updated_at });
+    applyCloudData(data.data);
+    await enterAppFromSession();
+  });
+
+  $("#createFarmForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    $("#authError").classList.add("hidden");
+    const sb = getSupabase();
+    if (!sb) return showAuthError(t("cloudSetupNeeded"));
+    const fd = new FormData(e.target);
+    const password = String(fd.get("password") || "");
+    const confirm = String(fd.get("confirm") || "");
+    if (password !== confirm) return showAuthError(t("passwordMismatch"));
+    setAuthBusy(true);
+    let created = null;
+    let lastError = null;
+    for (let i = 0; i < 5; i++) {
+      const farmId = generateFarmId();
+      const fresh = defaultState();
+      fresh.settings.language = state.settings.language || "en";
+      fresh.settings.seasonName = defaultSeasonName(fresh.settings.language);
+      const { data, error } = await sb.rpc("create_farm", {
+        p_farm_id: farmId,
+        p_password: password,
+        p_data: {
+          settings: fresh.settings,
+          expenses: [],
+          markets: [],
+          plans: [],
+        },
+      });
+      if (!error) {
+        created = data;
+        break;
+      }
+      lastError = error;
+      if (!String(error.message || "").includes("FARM_EXISTS")) break;
+    }
+    setAuthBusy(false);
+    if (!created) return showAuthError(mapAuthError(lastError));
+    setLocalOnly(false);
+    saveSession({ farmId: created.farm_id, token: created.token, updatedAt: created.updated_at });
+    applyCloudData(created.data);
+    alert(`${t("farmCreated")}\n${created.farm_id}`);
+    await enterAppFromSession();
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && loadSession()?.token && !cloudBusy) {
+      pullFromCloud().catch(() => {});
+    }
   });
 
   $("#addPlanBtn").addEventListener("click", () => {
@@ -868,7 +1224,25 @@
     navigator.serviceWorker.register("./sw.js").catch(() => {});
   }
 
-  applyI18n();
-  fillDefaultDates();
-  renderAll();
+  (async function boot() {
+    applyI18n();
+    fillDefaultDates();
+    const session = loadSession();
+    if (session?.token && cloudConfigured()) {
+      showAppShell();
+      renderAll();
+      const ok = await pullFromCloud();
+      if (!ok && !loadSession()) return;
+      return;
+    }
+    if (isLocalOnly() && !cloudConfigured()) {
+      await enterAppFromSession();
+      return;
+    }
+    if (isLocalOnly() && cloudConfigured() && !session) {
+      // Prefer cloud login once configured
+      setLocalOnly(false);
+    }
+    showAuthGate();
+  })();
 })();

@@ -1,9 +1,10 @@
-const CACHE = "agriman-v1";
+const CACHE = "agriman-v2";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
+  "./config.js",
   "./manifest.json",
   "./logo.jpg",
 ];

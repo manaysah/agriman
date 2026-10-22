@@ -144,6 +144,134 @@ html[dir="rtl"] .brand {
   font-size: 0.92rem;
 }
 
+.sync-label {
+  margin: 2px 0 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.sync-label[data-kind="ok"] {
+  color: var(--revenue);
+}
+
+.sync-label[data-kind="error"] {
+  color: var(--expense);
+}
+
+.sync-label[data-kind="saving"] {
+  color: var(--crop);
+}
+
+.hidden {
+  display: none !important;
+}
+
+.auth-gate {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px calc(24px + env(safe-area-inset-bottom, 0px));
+}
+
+.auth-card {
+  width: min(440px, 100%);
+  padding: 28px 22px;
+  border-radius: 28px;
+  background: rgba(255, 250, 242, 0.94);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+
+.auth-card h1 {
+  margin: 14px 0 8px;
+  font-family: "Literata", Georgia, serif;
+  font-size: 2rem;
+  color: var(--leaf);
+}
+
+html[dir="rtl"] .auth-card h1 {
+  font-family: "Cairo", sans-serif;
+}
+
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin: 18px 0 14px;
+  padding: 4px;
+  border-radius: 14px;
+  background: rgba(42, 31, 20, 0.06);
+}
+
+.auth-tab {
+  border: 0;
+  border-radius: 11px;
+  padding: 10px 8px;
+  background: transparent;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.auth-tab.active {
+  background: #fff;
+  color: var(--leaf);
+  box-shadow: 0 2px 10px rgba(42, 31, 20, 0.08);
+}
+
+.auth-form {
+  text-align: start;
+  margin-top: 8px;
+}
+
+.auth-warn {
+  margin: 14px 0;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(196, 163, 90, 0.18);
+  border: 1px solid rgba(196, 163, 90, 0.35);
+  text-align: start;
+}
+
+.auth-warn p {
+  margin: 0 0 10px;
+  color: var(--soil);
+  line-height: 1.45;
+  font-size: 0.92rem;
+}
+
+.auth-error {
+  margin: 12px 0 0;
+  color: var(--expense);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.farm-id-box {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(47, 90, 61, 0.08);
+  border: 1px solid var(--line);
+  margin-bottom: 8px;
+}
+
+.farm-id-box .muted {
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+.farm-id-value {
+  margin: 6px 0 10px;
+  font-family: "Literata", Georgia, serif;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--leaf);
+  letter-spacing: 0.04em;
+  word-break: break-all;
+}
+
 .icon-btn,
 .text-btn,
 .ghost-btn,

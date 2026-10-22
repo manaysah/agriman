@@ -23,13 +23,69 @@
     <title>AgriMan</title>
   </head>
   <body>
-    <div id="app">
+    <!-- AUTH / CLOUD GATE -->
+    <div id="authGate" class="auth-gate" aria-live="polite">
+      <div class="auth-card">
+        <img class="about-logo" src="logo.jpg" width="84" height="84" alt="AgriMan" />
+        <h1>AgriMan</h1>
+        <p class="about-tagline" data-i18n="authTagline">
+          Shared farm ledger — Farm ID + password, synced safely in the cloud.
+        </p>
+
+        <div id="authSetupWarn" class="auth-warn hidden">
+          <p data-i18n="cloudSetupNeeded">
+            Cloud sync is not configured yet. Open SETUP-CLOUD.md to connect your free Supabase project, or continue on this device only.
+          </p>
+          <button type="button" class="ghost-btn" id="continueLocalBtn" data-i18n="continueLocal">
+            Continue on this device only
+          </button>
+        </div>
+
+        <div id="authTabs" class="auth-tabs">
+          <button type="button" class="auth-tab active" data-auth-tab="join" data-i18n="joinFarm">Join farm</button>
+          <button type="button" class="auth-tab" data-auth-tab="create" data-i18n="createFarm">Create farm</button>
+        </div>
+
+        <form id="joinFarmForm" class="form auth-form">
+          <label>
+            <span data-i18n="farmId">Farm ID</span>
+            <input type="text" name="farmId" autocomplete="username" required placeholder="AM-XXXXXX" />
+          </label>
+          <label>
+            <span data-i18n="password">Password</span>
+            <input type="password" name="password" autocomplete="current-password" required minlength="6" />
+          </label>
+          <button type="submit" class="primary-btn" data-i18n="joinFarm">Join farm</button>
+        </form>
+
+        <form id="createFarmForm" class="form auth-form hidden">
+          <label>
+            <span data-i18n="password">Password</span>
+            <input type="password" name="password" autocomplete="new-password" required minlength="6" />
+          </label>
+          <label>
+            <span data-i18n="confirmPassword">Confirm password</span>
+            <input type="password" name="confirm" autocomplete="new-password" required minlength="6" />
+          </label>
+          <p class="hint" data-i18n="createFarmHint">
+            We’ll generate a Farm ID. Share the ID and password with your partner.
+          </p>
+          <button type="submit" class="primary-btn" data-i18n="createFarm">Create farm</button>
+        </form>
+
+        <p id="authError" class="auth-error hidden"></p>
+        <p id="authBusy" class="hint hidden" data-i18n="pleaseWait">Please wait…</p>
+      </div>
+    </div>
+
+    <div id="app" class="hidden">
       <header class="topbar">
         <div class="brand-block">
           <img class="brand-logo" src="logo.jpg" width="48" height="48" alt="AgriMan" />
           <div>
             <p class="brand">AgriMan</p>
             <p class="season-label" id="seasonLabel">—</p>
+            <p class="sync-label" id="syncLabel"></p>
           </div>
         </div>
         <div class="top-actions">
@@ -227,7 +283,7 @@
               </div>
               <div>
                 <dt data-i18n="version">Version</dt>
-                <dd>1.1.0</dd>
+                <dd>1.2.0</dd>
               </div>
             </dl>
             <p class="about-note" data-i18n="aboutNote">
@@ -262,6 +318,15 @@
     <dialog id="settingsDialog">
       <form method="dialog" id="settingsForm" class="form modal-form">
         <h2 data-i18n="settings">Settings</h2>
+        <div class="farm-id-box">
+          <p class="muted" data-i18n="yourFarmId">Your Farm ID</p>
+          <p class="farm-id-value" id="settingsFarmId">—</p>
+          <div class="modal-actions">
+            <button type="button" class="ghost-btn" id="copyFarmIdBtn" data-i18n="copyFarmId">Copy Farm ID</button>
+            <button type="button" class="ghost-btn" id="syncNowBtn" data-i18n="syncNow">Sync now</button>
+            <button type="button" class="ghost-btn danger" id="logoutBtn" data-i18n="logout">Log out</button>
+          </div>
+        </div>
         <label>
           <span data-i18n="language">Language</span>
           <select name="language" id="settingsLanguage">
@@ -286,7 +351,7 @@
           <button type="button" class="ghost-btn" id="closeSettings" data-i18n="close">Close</button>
         </div>
         <p class="hint" data-i18n="settingsHint">
-          Data stays on this phone/browser. Export a backup before switching devices.
+          Cloud farm data is shared with anyone who has your Farm ID and password. Export a backup as extra safety.
         </p>
       </form>
     </dialog>
@@ -319,6 +384,8 @@
     </dialog>
 
     <input type="file" id="importFile" accept="application/json" hidden />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
