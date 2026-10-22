@@ -1,0 +1,6 @@
+name = "agriman"
+compatibility_date = "2024-11-12"
+pages_build_output_dir = "."
+
+# Bind D1 in the Cloudflare dashboard as variable name: DB
+# (Workers & Pages → agriman → Settings → Bindings → D1 → DB)

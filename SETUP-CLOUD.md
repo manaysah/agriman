@@ -1,50 +1,44 @@
 # AgriMan cloud sync (Farm ID + password)
 
-This lets two partners share one farm ledger on any device. Data is stored in your own free Supabase database (not only on the phone).
+Partners share one ledger on any device. Data is stored in **Cloudflare D1** (free with your existing Cloudflare account).
 
-## 1. Create a free Supabase project
+## One-time setup (about 2 minutes)
 
-1. Go to [https://supabase.com](https://supabase.com) and sign up
-2. **New project** → pick a name, set a database password (save it), choose a region
-3. Wait until the project is ready
+### 1. Push this code (already includes the API)
 
-## 2. Create the database tables
+Make sure GitHub `main` is up to date so Cloudflare redeploys with the `functions/` API.
 
-1. In Supabase: **SQL** → **New query**
-2. Open `supabase/schema.sql` from this repo, paste all of it, click **Run**
-3. Confirm it succeeds (no red errors)
+### 2. Create a D1 database and bind it
 
-## 3. Copy API keys into AgriMan
+1. Open [Cloudflare Dashboard](https://dash.cloudflare.com) → **Workers & Pages**
+2. Click your **agriman** project
+3. Go to **Settings** → **Bindings** (or **Functions** → **D1 database bindings**)
+4. **Add binding**
+   - Type: **D1 database**
+   - Variable name: **`DB`** (must be exactly `DB`)
+   - Database: **Create new** → name it `agriman-db` (any name is fine)
+5. **Save** and **Deploy** / retry deployment if asked
 
-1. Supabase → **Project Settings** → **API**
-2. Copy **Project URL** and the **anon public** key
-3. Edit `config.js` in this project:
+### 3. Verify
 
-```js
-window.AGRIMAN_CONFIG = {
-  supabaseUrl: "https://xxxx.supabase.co",
-  supabaseAnonKey: "eyJhbGciOi...",
-};
+1. Open your live URL
+2. You should see **Join farm** / **Create farm** (not only “this device only”)
+3. Tap **Create farm** → choose a password (6+ characters)
+4. Copy the **Farm ID** (e.g. `AM-XXXXXX`) and share **ID + password** with your partner
+5. Partner uses **Join farm** with the same ID + password
+
+### 4. Check stored farms (optional)
+
+Cloudflare → **Workers & Pages** → **D1** → `agriman-db` → **Console**:
+
+```sql
+SELECT farm_id, updated_at FROM farms;
 ```
 
-## 4. Deploy
+There is no separate users table — each row in `farms` is a shared farm account.
 
-Commit and push to GitHub so Cloudflare redeploys:
+## Notes
 
-```bash
-cd ~/Projects/farm-money-tracker
-git add config.js supabase SETUP-CLOUD.md index.html app.js styles.css README.md
-git commit -m "Add Farm ID cloud sync for partners"
-git push
-```
-
-**Security note:** the anon key is meant to be public in the browser. Access is protected by Farm ID + password via secure database functions (passwords are hashed; table rows are not directly readable).
-
-## 5. Use it
-
-1. Open your Cloudflare URL
-2. **Create farm** → set a password → share the **Farm ID** + password with your partner
-3. Partner chooses **Join farm** and enters the same Farm ID + password
-4. Both phones stay aligned; clearing cache does not delete the cloud farm (just log in again)
-
-Keep using **Export backup** in Settings as an extra safety copy.
+- Clearing phone cache does **not** delete the cloud farm — just join again with Farm ID + password
+- Use **Settings → Sync now** if two phones edited while offline
+- Keep **Export backup** as an extra safety copy

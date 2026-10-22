@@ -109,7 +109,7 @@
       fall: "Fall",
       authTagline: "Shared farm ledger — Farm ID + password, synced safely in the cloud.",
       cloudSetupNeeded:
-        "Cloud sync is not configured yet. Follow SETUP-CLOUD.md to connect your free Supabase project, or continue on this device only.",
+        "Cloud sync needs a D1 database binding on Cloudflare (see SETUP-CLOUD.md). You can continue on this device only until then.",
       continueLocal: "Continue on this device only",
       joinFarm: "Join farm",
       createFarm: "Create farm",
@@ -236,7 +236,7 @@
       fall: "خريف",
       authTagline: "دفتر مزرعة مشترك — معرّف المزرعة وكلمة المرور، بمزامنة آمنة في السحابة.",
       cloudSetupNeeded:
-        "المزامنة السحابية غير مُعدّة بعد. اتبع SETUP-CLOUD.md لربط مشروع Supabase المجاني، أو تابع على هذا الجهاز فقط.",
+        "المزامنة السحابية تحتاج ربط قاعدة D1 على Cloudflare (انظر SETUP-CLOUD.md). يمكنك المتابعة على هذا الجهاز فقط حالياً.",
       continueLocal: "المتابعة على هذا الجهاز فقط",
       joinFarm: "الانضمام للمزرعة",
       createFarm: "إنشاء مزرعة",
@@ -358,19 +358,54 @@
     return `AM-${body}`;
   }
 
-  function cloudConfigured() {
+  let cloudReady = null; // null=unknown, true/false after probe
+
+  function supabaseConfigured() {
     const cfg = window.AGRIMAN_CONFIG || {};
-    return Boolean(cfg.supabaseUrl && cfg.supabaseAnonKey && !cfg.supabaseUrl.includes("YOUR_PROJECT"));
+    return Boolean(
+      cfg.supabaseUrl && cfg.supabaseAnonKey && !String(cfg.supabaseUrl).includes("YOUR_PROJECT")
+    );
+  }
+
+  function cloudConfigured() {
+    if (supabaseConfigured()) return true;
+    return cloudReady === true;
   }
 
   function getSupabase() {
-    if (!cloudConfigured()) return null;
+    if (!supabaseConfigured()) return null;
     if (!window.__agrimanSb) {
       const { createClient } = window.supabase;
       const cfg = window.AGRIMAN_CONFIG;
       window.__agrimanSb = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
     }
     return window.__agrimanSb;
+  }
+
+  async function probeCloud() {
+    try {
+      const r = await fetch("/api/farm/health", { method: "GET", cache: "no-store" });
+      const body = await r.json().catch(() => ({}));
+      cloudReady = r.ok && body.ok === true;
+    } catch {
+      cloudReady = false;
+    }
+    return cloudReady;
+  }
+
+  async function apiFarm(action, body) {
+    const r = await fetch(`/api/farm/${action}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body || {}),
+    });
+    const json = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      const error = new Error(json.error || "REQUEST_FAILED");
+      error.code = json.error || "REQUEST_FAILED";
+      throw error;
+    }
+    return json;
   }
 
   function loadSession() {
@@ -419,12 +454,13 @@
   }
 
   function mapAuthError(err) {
-    const msg = String(err?.message || err || "");
+    const msg = String(err?.code || err?.message || err || "");
     if (msg.includes("BAD_LOGIN")) return t("authErrorGeneric");
     if (msg.includes("FARM_EXISTS")) return "Farm ID already exists. Try again.";
     if (msg.includes("WEAK_PASSWORD")) return "Password must be at least 6 characters.";
     if (msg.includes("BAD_SESSION")) return t("authErrorGeneric");
     if (msg.includes("INVALID_FARM_ID")) return "Invalid Farm ID.";
+    if (msg.includes("DB_NOT_BOUND")) return t("cloudSetupNeeded");
     return t("authErrorGeneric");
   }
 
@@ -450,47 +486,64 @@
 
   async function pushToCloud() {
     const session = loadSession();
-    const sb = getSupabase();
-    if (!session?.token || !sb) return false;
+    if (!session?.token || !cloudConfigured()) return false;
     cloudBusy = true;
-    const { data, error } = await sb.rpc("save_farm", {
-      p_token: session.token,
-      p_data: payloadFromState(),
-    });
-    cloudBusy = false;
-    if (error) {
+    try {
+      let data;
+      const sb = getSupabase();
+      if (sb) {
+        const res = await sb.rpc("save_farm", {
+          p_token: session.token,
+          p_data: payloadFromState(),
+        });
+        if (res.error) throw res.error;
+        data = res.data;
+      } else {
+        data = await apiFarm("save", { token: session.token, data: payloadFromState() });
+      }
+      if (data?.updated_at) {
+        session.updatedAt = data.updated_at;
+        saveSession(session);
+      }
+      setSyncLabel(`${t("syncOk")} · ${session.farmId}`, "ok");
+      return true;
+    } catch {
       setSyncLabel(t("syncError"), "error");
       return false;
+    } finally {
+      cloudBusy = false;
     }
-    if (data?.updated_at) {
-      session.updatedAt = data.updated_at;
-      saveSession(session);
-    }
-    setSyncLabel(`${t("syncOk")} · ${session.farmId}`, "ok");
-    return true;
   }
 
   async function pullFromCloud() {
     const session = loadSession();
-    const sb = getSupabase();
-    if (!session?.token || !sb) return false;
-    const { data, error } = await sb.rpc("load_farm", { p_token: session.token });
-    if (error) {
-      if (String(error.message || "").includes("BAD_SESSION")) {
+    if (!session?.token || !cloudConfigured()) return false;
+    try {
+      let data;
+      const sb = getSupabase();
+      if (sb) {
+        const res = await sb.rpc("load_farm", { p_token: session.token });
+        if (res.error) throw res.error;
+        data = res.data;
+      } else {
+        data = await apiFarm("load", { token: session.token });
+      }
+      applyCloudData(data.data);
+      session.updatedAt = data.updated_at;
+      session.farmId = data.farm_id;
+      saveSession(session);
+      setSyncLabel(`${t("syncOk")} · ${session.farmId}`, "ok");
+      applyI18n();
+      renderAll();
+      return true;
+    } catch (e) {
+      if (String(e?.code || e?.message || "").includes("BAD_SESSION")) {
         saveSession(null);
         showAuthGate();
       }
       setSyncLabel(t("syncError"), "error");
       return false;
     }
-    applyCloudData(data.data);
-    session.updatedAt = data.updated_at;
-    session.farmId = data.farm_id;
-    saveSession(session);
-    setSyncLabel(`${t("syncOk")} · ${session.farmId}`, "ok");
-    applyI18n();
-    renderAll();
-    return true;
   }
 
   function showAuthGate() {
@@ -1129,63 +1182,86 @@
   $("#joinFarmForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     $("#authError").classList.add("hidden");
-    const sb = getSupabase();
-    if (!sb) return showAuthError(t("cloudSetupNeeded"));
+    if (!cloudConfigured()) return showAuthError(t("cloudSetupNeeded"));
     const fd = new FormData(e.target);
     setAuthBusy(true);
-    const { data, error } = await sb.rpc("login_farm", {
-      p_farm_id: String(fd.get("farmId") || "").trim(),
-      p_password: String(fd.get("password") || ""),
-    });
-    setAuthBusy(false);
-    if (error) return showAuthError(mapAuthError(error));
-    setLocalOnly(false);
-    saveSession({ farmId: data.farm_id, token: data.token, updatedAt: data.updated_at });
-    applyCloudData(data.data);
-    await enterAppFromSession();
+    try {
+      let data;
+      const sb = getSupabase();
+      if (sb) {
+        const res = await sb.rpc("login_farm", {
+          p_farm_id: String(fd.get("farmId") || "").trim(),
+          p_password: String(fd.get("password") || ""),
+        });
+        if (res.error) throw res.error;
+        data = res.data;
+      } else {
+        data = await apiFarm("login", {
+          farmId: String(fd.get("farmId") || "").trim(),
+          password: String(fd.get("password") || ""),
+        });
+      }
+      setLocalOnly(false);
+      saveSession({ farmId: data.farm_id, token: data.token, updatedAt: data.updated_at });
+      applyCloudData(data.data);
+      await enterAppFromSession();
+    } catch (err) {
+      showAuthError(mapAuthError(err));
+    } finally {
+      setAuthBusy(false);
+    }
   });
 
   $("#createFarmForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     $("#authError").classList.add("hidden");
-    const sb = getSupabase();
-    if (!sb) return showAuthError(t("cloudSetupNeeded"));
+    if (!cloudConfigured()) return showAuthError(t("cloudSetupNeeded"));
     const fd = new FormData(e.target);
     const password = String(fd.get("password") || "");
     const confirm = String(fd.get("confirm") || "");
     if (password !== confirm) return showAuthError(t("passwordMismatch"));
     setAuthBusy(true);
-    let created = null;
-    let lastError = null;
-    for (let i = 0; i < 5; i++) {
-      const farmId = generateFarmId();
+    try {
       const fresh = defaultState();
       fresh.settings.language = state.settings.language || "en";
       fresh.settings.seasonName = defaultSeasonName(fresh.settings.language);
-      const { data, error } = await sb.rpc("create_farm", {
-        p_farm_id: farmId,
-        p_password: password,
-        p_data: {
-          settings: fresh.settings,
-          expenses: [],
-          markets: [],
-          plans: [],
-        },
-      });
-      if (!error) {
-        created = data;
-        break;
+      const payload = {
+        settings: fresh.settings,
+        expenses: [],
+        markets: [],
+        plans: [],
+      };
+      let created;
+      const sb = getSupabase();
+      if (sb) {
+        let lastError = null;
+        for (let i = 0; i < 5; i++) {
+          const res = await sb.rpc("create_farm", {
+            p_farm_id: generateFarmId(),
+            p_password: password,
+            p_data: payload,
+          });
+          if (!res.error) {
+            created = res.data;
+            break;
+          }
+          lastError = res.error;
+          if (!String(res.error.message || "").includes("FARM_EXISTS")) break;
+        }
+        if (!created) throw lastError || new Error("FARM_EXISTS");
+      } else {
+        created = await apiFarm("create", { password, data: payload });
       }
-      lastError = error;
-      if (!String(error.message || "").includes("FARM_EXISTS")) break;
+      setLocalOnly(false);
+      saveSession({ farmId: created.farm_id, token: created.token, updatedAt: created.updated_at });
+      applyCloudData(created.data);
+      alert(`${t("farmCreated")}\n${created.farm_id}`);
+      await enterAppFromSession();
+    } catch (err) {
+      showAuthError(mapAuthError(err));
+    } finally {
+      setAuthBusy(false);
     }
-    setAuthBusy(false);
-    if (!created) return showAuthError(mapAuthError(lastError));
-    setLocalOnly(false);
-    saveSession({ farmId: created.farm_id, token: created.token, updatedAt: created.updated_at });
-    applyCloudData(created.data);
-    alert(`${t("farmCreated")}\n${created.farm_id}`);
-    await enterAppFromSession();
   });
 
   document.addEventListener("visibilitychange", () => {
@@ -1227,6 +1303,7 @@
   (async function boot() {
     applyI18n();
     fillDefaultDates();
+    await probeCloud();
     const session = loadSession();
     if (session?.token && cloudConfigured()) {
       showAppShell();
@@ -1240,7 +1317,6 @@
       return;
     }
     if (isLocalOnly() && cloudConfigured() && !session) {
-      // Prefer cloud login once configured
       setLocalOnly(false);
     }
     showAuthGate();

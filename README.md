@@ -1,25 +1,20 @@
 # AgriMan
 
-Farm money tracker for expenses, daily market sales, transport fees, a season calendar, and profit.
+Farm money tracker for expenses, daily market sales, transport, calendar, and profit.
 
 **Creator alias:** Manaysah
 
 ## Features
 
-- **Farm ID + password** — two partners share one cloud ledger on any device
-- **Safe cloud storage** — data survives clearing phone cache (log in again with Farm ID + password)
-- **Expenses** — land, seeds, plants, water, labor, and more
-- **Market** — daily sales with quantity, buyer, and transport fee
-- **Calendar** — day-by-day money in/out + planned season payments
-- **Profit** — revenue − all costs for the season
-- **Language** — English / العربية (RTL)
-- **Export backup** — download a JSON file from Settings
+- **Farm ID + password** — partners share one cloud ledger on any device (Cloudflare D1)
+- **Safe cloud storage** — survives clearing phone cache (join again with Farm ID + password)
+- Expenses, market trips + transport, calendar plans, profit
+- English / العربية
+- Export backup
 
-## Cloud setup (required for shared partners)
+## Cloud setup
 
-Follow **[SETUP-CLOUD.md](./SETUP-CLOUD.md)** (free Supabase project + paste keys into `config.js`).
-
-Until cloud is configured you can still use **Continue on this device only**.
+See **[SETUP-CLOUD.md](./SETUP-CLOUD.md)** — bind a free Cloudflare **D1** database as `DB`, then Create farm.
 
 ## Local preview
 
@@ -27,4 +22,4 @@ Until cloud is configured you can still use **Continue on this device only**.
 python3 -m http.server 5173
 ```
 
-Open [http://localhost:5173](http://localhost:5173).
+Local preview is device-only (API runs on Cloudflare after deploy).
