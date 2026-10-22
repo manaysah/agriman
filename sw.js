@@ -1,4 +1,4 @@
-const CACHE = "agriman-v2";
+const CACHE = "agriman-v3";
 const ASSETS = [
   "./",
   "./index.html",
