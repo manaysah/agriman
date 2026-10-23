@@ -1,23 +1,22 @@
 # AgriMan cloud sync
 
-## Important
+Live app: https://agriman.agribakr.workers.dev/
 
-`agriman` is a **Cloudflare Worker** (not Pages).
+## Cloudflare Git deploy settings (fix the build error)
 
-- Live app: https://agriman.agribakr.workers.dev/
-- D1 database: `agriman-db` bound as `DB`
-- Health: https://agriman.agribakr.workers.dev/api/farm/health
+Your project is a **Worker**. In **Workers & Pages → agriman → Settings → Build**:
 
-## Build settings (Workers / Git)
+| Setting | Value |
+|--------|--------|
+| Build command | *(leave empty)* |
+| **Deploy command** | `npx wrangler deploy ./src/worker.js --assets=.` |
 
-If Git auto-deploy fails:
+Do **not** use `wrangler pages deploy`.
 
-- Do **not** use Pages-only settings
-- `wrangler.toml` must include `main = "src/worker.js"` and `[assets]`
-- Build/deploy should use **Workers** (`wrangler deploy`), not `wrangler pages deploy`
+We removed the `functions/` folder (that made Cloudflare think this was Pages and then fail with “Missing entry-point”).
 
-## Use the app
+## After deploy
 
 1. Open https://agriman.agribakr.workers.dev/
-2. **Create farm** → password
-3. Share **Farm ID + password** → partner uses **Join farm**
+2. Check https://agriman.agribakr.workers.dev/api/farm/health → `{"ok":true,...}`
+3. **Create farm** / **Join farm**
