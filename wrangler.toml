@@ -1,6 +1,18 @@
 name = "agriman"
+main = "src/worker.js"
 compatibility_date = "2024-11-12"
-pages_build_output_dir = "."
 
-# Bind D1 in the Cloudflare dashboard as variable name: DB
-# (Workers & Pages → agriman → Settings → Bindings → D1 → DB)
+# Static site files (HTML/CSS/JS/logo) served via ASSETS binding
+[assets]
+directory = "."
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+# After this Worker deploys (not static-only), add D1 in the dashboard:
+# Settings → Bindings → D1 → Variable name must be: DB
+# Or uncomment below after creating a D1 database and pasting its ID:
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "agriman-db"
+# database_id = "YOUR_D1_DATABASE_ID"

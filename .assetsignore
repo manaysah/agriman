@@ -1,0 +1,9 @@
+src/
+functions/
+supabase/
+.git/
+.gitignore
+.assetsignore
+wrangler.toml
+*.md
+.DS_Store
