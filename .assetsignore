@@ -1,9 +1,11 @@
 src/
 functions/
 supabase/
+.tools/
 .git/
 .gitignore
 .assetsignore
 wrangler.toml
 *.md
 .DS_Store
+node_modules/

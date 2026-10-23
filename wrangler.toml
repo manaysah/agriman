@@ -1,18 +1,16 @@
 name = "agriman"
 main = "src/worker.js"
 compatibility_date = "2024-11-12"
+account_id = "33b8081b03d586f1045d8f49d71d5dff"
 
-# Static site files (HTML/CSS/JS/logo) served via ASSETS binding
+# Static site files served via ASSETS binding
 [assets]
 directory = "."
 binding = "ASSETS"
 not_found_handling = "single-page-application"
 run_worker_first = ["/api/*"]
 
-# After this Worker deploys (not static-only), add D1 in the dashboard:
-# Settings → Bindings → D1 → Variable name must be: DB
-# Or uncomment below after creating a D1 database and pasting its ID:
-# [[d1_databases]]
-# binding = "DB"
-# database_name = "agriman-db"
-# database_id = "YOUR_D1_DATABASE_ID"
+[[d1_databases]]
+binding = "DB"
+database_name = "agriman-db"
+database_id = "570a6705-799b-4807-8ec0-c598509bcd09"
