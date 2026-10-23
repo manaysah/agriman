@@ -2,6 +2,7 @@ src/
 functions/
 supabase/
 .tools/
+.wrangler/
 .git/
 .gitignore
 .assetsignore

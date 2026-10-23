@@ -3,4 +3,5 @@
 .vscode/
 .idea/
 .tools/
+.wrangler/
 node_modules/
