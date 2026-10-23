@@ -1,34 +1,23 @@
-# AgriMan cloud sync (Farm ID + password)
+# AgriMan cloud sync
 
-Cloud data uses **Cloudflare D1** (`agriman-db`) bound as **`DB`**.
+## Important
 
-## Cloudflare Pages build settings
+`agriman` is a **Cloudflare Worker** (not Pages).
 
-In **Workers & Pages → agriman → Settings → Builds**:
+- Live app: https://agriman.agribakr.workers.dev/
+- D1 database: `agriman-db` bound as `DB`
+- Health: https://agriman.agribakr.workers.dev/api/farm/health
 
-| Setting | Value |
-|--------|--------|
-| Framework preset | **None** |
-| Build command | **leave empty** (do not use `wrangler deploy`) |
-| Build output directory | `/` or `.` |
+## Build settings (Workers / Git)
 
-`wrangler.toml` is configured for **Pages** (`pages_build_output_dir`), with D1 already set.
+If Git auto-deploy fails:
 
-## App usage
+- Do **not** use Pages-only settings
+- `wrangler.toml` must include `main = "src/worker.js"` and `[assets]`
+- Build/deploy should use **Workers** (`wrangler deploy`), not `wrangler pages deploy`
 
-1. Open your live Pages/Workers URL  
-2. **Create farm** → password  
-3. Share **Farm ID + password** with your partner → **Join farm**
+## Use the app
 
-## Check API
-
-`https://YOUR-URL/api/farm/health`  
-Should return: `{"ok":true,"provider":"cloudflare-d1"}`
-
-## Inspect farms
-
-**Workers & Pages → D1 → agriman-db → Console:**
-
-```sql
-SELECT farm_id, updated_at FROM farms;
-```
+1. Open https://agriman.agribakr.workers.dev/
+2. **Create farm** → password
+3. Share **Farm ID + password** → partner uses **Join farm**
