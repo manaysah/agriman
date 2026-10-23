@@ -1,39 +1,34 @@
 # AgriMan cloud sync (Farm ID + password)
 
-## Why you saw “Bindings cannot be added…”
+Cloud data uses **Cloudflare D1** (`agriman-db`) bound as **`DB`**.
 
-A **static-assets-only** Worker cannot use D1. AgriMan is now a real Worker (`src/worker.js`) that serves the website **and** `/api/*`, so bindings work.
+## Cloudflare Pages build settings
 
-## Setup
+In **Workers & Pages → agriman → Settings → Builds**:
 
-### 1. Deploy this update
+| Setting | Value |
+|--------|--------|
+| Framework preset | **None** |
+| Build command | **leave empty** (do not use `wrangler deploy`) |
+| Build output directory | `/` or `.` |
 
-Push to GitHub and wait for Cloudflare to finish deploying `agriman`.
+`wrangler.toml` is configured for **Pages** (`pages_build_output_dir`), with D1 already set.
 
-### 2. Add the D1 binding
+## App usage
 
-1. [Cloudflare Dashboard](https://dash.cloudflare.com) → **Workers & Pages** → **agriman**
-2. **Settings** → **Bindings** → **Add**
-3. Choose **D1 database**
-   - **Variable name:** `DB` (exactly)
-   - **Database:** Create `agriman-db` (or pick an existing one)
-4. **Save** → **Deploy** if Cloudflare asks
+1. Open your live Pages/Workers URL  
+2. **Create farm** → password  
+3. Share **Farm ID + password** with your partner → **Join farm**
 
-The error about static-only bindings should be gone now that the Worker script exists.
+## Check API
 
-### 3. Use the app
+`https://YOUR-URL/api/farm/health`  
+Should return: `{"ok":true,"provider":"cloudflare-d1"}`
 
-1. Open your live URL  
-2. **Create farm** → password (6+ chars)  
-3. Copy **Farm ID** (e.g. `AM-XXXXXX`)  
-4. Partner opens the same URL → **Join farm** with that ID + password  
+## Inspect farms
 
-### 4. Inspect data (optional)
-
-**Workers & Pages** → **D1** → your database → Console:
+**Workers & Pages → D1 → agriman-db → Console:**
 
 ```sql
 SELECT farm_id, updated_at FROM farms;
 ```
-
-No separate users table — each `farms` row is one shared farm account.
