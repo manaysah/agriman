@@ -38,7 +38,7 @@ async function hashPassword(password, saltBytes) {
     "deriveBits",
   ]);
   const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt: saltBytes, iterations: 120000, hash: "SHA-256" },
+    { name: "PBKDF2", salt: saltBytes, iterations: 100000, hash: "SHA-256" },
     key,
     256
   );
@@ -58,24 +58,26 @@ function generateFarmId() {
 }
 
 async function ensureSchema(db) {
-  await db.batch([
-    db.prepare(`
-      CREATE TABLE IF NOT EXISTS farms (
+  await db
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS farms (
         farm_id TEXT PRIMARY KEY,
         password_salt TEXT NOT NULL,
         password_hash TEXT NOT NULL,
         data TEXT NOT NULL,
         updated_at TEXT NOT NULL
-      )
-    `),
-    db.prepare(`
-      CREATE TABLE IF NOT EXISTS sessions (
+      )`
+    )
+    .run();
+  await db
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS sessions (
         token TEXT PRIMARY KEY,
         farm_id TEXT NOT NULL,
         expires_at TEXT NOT NULL
-      )
-    `),
-  ]);
+      )`
+    )
+    .run();
 }
 
 function expiryIso(days = 180) {
@@ -105,40 +107,52 @@ async function handleCreate(env, body) {
   if (password.length < 6) return err("WEAK_PASSWORD");
   await ensureSchema(env.DB);
 
+  const data = body?.data && typeof body.data === "object" ? body.data : {};
+  const dataJson = JSON.stringify(data);
   let farmId = "";
-  let created = false;
+  let lastDetail = "";
+
   for (let i = 0; i < 8; i++) {
     farmId = generateFarmId();
     const salt = crypto.getRandomValues(new Uint8Array(16));
     const passwordHash = await hashPassword(password, salt);
-    const data = body?.data && typeof body.data === "object" ? body.data : {};
     const updatedAt = new Date().toISOString();
     try {
-      await env.DB.prepare(
+      const insert = await env.DB.prepare(
         `INSERT INTO farms (farm_id, password_salt, password_hash, data, updated_at)
          VALUES (?, ?, ?, ?, ?)`
       )
-        .bind(farmId, b64(salt), passwordHash, JSON.stringify(data), updatedAt)
+        .bind(farmId, b64(salt), passwordHash, dataJson, updatedAt)
         .run();
-      created = true;
-      break;
-    } catch {
-      // retry on id collision
+      if (!insert?.success) {
+        lastDetail = JSON.stringify(insert);
+        continue;
+      }
+
+      const token = newToken();
+      const sess = await env.DB.prepare(
+        `INSERT INTO sessions (token, farm_id, expires_at) VALUES (?, ?, ?)`
+      )
+        .bind(token, farmId, expiryIso())
+        .run();
+      if (!sess?.success) {
+        lastDetail = JSON.stringify(sess);
+        continue;
+      }
+
+      return json({
+        farm_id: farmId,
+        token,
+        data,
+        updated_at: updatedAt,
+      });
+    } catch (e) {
+      lastDetail = String(e?.message || e);
+      // retry on collision / transient errors
     }
   }
-  if (!created) return err("FARM_EXISTS", 409);
 
-  const token = newToken();
-  await env.DB.prepare(`INSERT INTO sessions (token, farm_id, expires_at) VALUES (?, ?, ?)`)
-    .bind(token, farmId, expiryIso())
-    .run();
-
-  return json({
-    farm_id: farmId,
-    token,
-    data: body?.data && typeof body.data === "object" ? body.data : {},
-    updated_at: new Date().toISOString(),
-  });
+  return json({ error: "CREATE_FAILED", detail: lastDetail }, 500);
 }
 
 async function handleLogin(env, body) {
@@ -273,13 +287,17 @@ async function handleApi(request, env) {
 
 export default {
   async fetch(request, env) {
-    const url = new URL(request.url);
-    if (url.pathname === "/api" || url.pathname.startsWith("/api/")) {
-      return handleApi(request, env);
+    try {
+      const url = new URL(request.url);
+      if (url.pathname === "/api" || url.pathname.startsWith("/api/")) {
+        return await handleApi(request, env);
+      }
+      if (env.ASSETS) {
+        return env.ASSETS.fetch(request);
+      }
+      return new Response("ASSETS binding missing", { status: 500 });
+    } catch (e) {
+      return json({ error: "WORKER_CRASH", detail: String(e?.message || e) }, 500);
     }
-    if (env.ASSETS) {
-      return env.ASSETS.fetch(request);
-    }
-    return new Response("ASSETS binding missing", { status: 500 });
   },
 };
