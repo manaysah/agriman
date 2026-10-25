@@ -2,6 +2,35 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      (function () {
+        var GEN = "6";
+        try {
+          if (localStorage.getItem("agriman-shell-gen") === GEN) return;
+          localStorage.setItem("agriman-shell-gen", GEN);
+          var reloadKey = "agriman-shell-reload";
+          if (sessionStorage.getItem(reloadKey)) {
+            sessionStorage.removeItem(reloadKey);
+            return;
+          }
+          var work = Promise.resolve();
+          if ("caches" in window) {
+            work = caches.keys().then(function (keys) {
+              return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+            });
+          }
+          work.then(function () {
+            if (!("serviceWorker" in navigator)) return;
+            return navigator.serviceWorker.getRegistrations().then(function (regs) {
+              return Promise.all(regs.map(function (r) { return r.unregister(); }));
+            });
+          }).then(function () {
+            sessionStorage.setItem(reloadKey, "1");
+            location.reload();
+          });
+        } catch (e) {}
+      })();
+    </script>
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"
@@ -19,7 +48,7 @@
       href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Literata:opsz,wght@7..72,500;7..72,700&family=Manrope:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=6" />
     <title>AgriMan</title>
   </head>
   <body>
@@ -29,7 +58,7 @@
         <img class="about-logo" src="logo.jpg" width="320" height="213" alt="AgriMan" />
         <h1>AgriMan</h1>
         <p class="about-tagline" data-i18n="authTagline">
-          Shared farm ledger — Farm ID + password, synced safely in the cloud.
+          Shared farm ledger — FarmerID + password, synced safely in the cloud.
         </p>
 
         <div id="authSetupWarn" class="auth-warn hidden">
@@ -42,23 +71,32 @@
         </div>
 
         <div id="authTabs" class="auth-tabs">
-          <button type="button" class="auth-tab active" data-auth-tab="join" data-i18n="joinFarm">Join farm</button>
-          <button type="button" class="auth-tab" data-auth-tab="create" data-i18n="createFarm">Create farm</button>
+          <button type="button" class="auth-tab active" data-auth-tab="login" data-i18n="login">Log in</button>
+          <button type="button" class="auth-tab" data-auth-tab="register" data-i18n="register">Register</button>
         </div>
 
-        <form id="joinFarmForm" class="form auth-form">
+        <form id="loginForm" class="form auth-form">
           <label>
-            <span data-i18n="farmId">Farm ID</span>
-            <input type="text" name="farmId" autocomplete="username" required placeholder="AM-XXXXXX" />
+            <span data-i18n="farmerId">FarmerID</span>
+            <input type="text" name="farmerId" autocomplete="username" required placeholder="AgriBakMan-XXXXXX" />
           </label>
           <label>
             <span data-i18n="password">Password</span>
             <input type="password" name="password" autocomplete="current-password" required minlength="6" />
           </label>
-          <button type="submit" class="primary-btn" data-i18n="joinFarm">Join farm</button>
+          <button type="submit" class="primary-btn" data-i18n="login">Log in</button>
         </form>
 
-        <form id="createFarmForm" class="form auth-form hidden">
+        <form id="registerForm" class="form auth-form hidden">
+          <label>
+            <span data-i18n="email">Email</span>
+            <input type="email" name="email" autocomplete="email" placeholder="you@example.com" />
+          </label>
+          <label>
+            <span data-i18n="phone">Phone</span>
+            <input type="tel" name="phone" autocomplete="tel" placeholder="+962…" />
+          </label>
+          <p class="hint" data-i18n="contactHint">Provide email or phone (or both).</p>
           <label>
             <span data-i18n="password">Password</span>
             <input type="password" name="password" autocomplete="new-password" required minlength="6" />
@@ -67,15 +105,40 @@
             <span data-i18n="confirmPassword">Confirm password</span>
             <input type="password" name="confirm" autocomplete="new-password" required minlength="6" />
           </label>
-          <p class="hint" data-i18n="createFarmHint">
-            We’ll generate a Farm ID. Share the ID and password with your partner.
+          <p class="hint" data-i18n="registerHint">
+            We’ll create your FarmerID (AgriBakMan-…) and email your credentials when possible.
           </p>
-          <button type="submit" class="primary-btn" data-i18n="createFarm">Create farm</button>
+          <button type="submit" class="primary-btn" data-i18n="register">Register</button>
         </form>
 
         <p id="authError" class="auth-error hidden"></p>
         <p id="authBusy" class="hint hidden" data-i18n="pleaseWait">Please wait…</p>
       </div>
+    </div>
+
+    <div id="farmsHub" class="farms-hub hidden">
+      <header class="topbar">
+        <div class="brand-block">
+          <img class="brand-logo" src="logo.jpg" width="160" height="106" alt="AgriMan" />
+          <div>
+            <p class="brand">AgriMan</p>
+            <p class="season-label" id="hubFarmerLabel">—</p>
+          </div>
+        </div>
+        <div class="top-actions">
+          <button type="button" class="ghost-btn" id="hubLogoutBtn" data-i18n="logout">Log out</button>
+        </div>
+      </header>
+      <main class="farms-hub-main">
+        <div class="panel">
+          <div class="panel-head">
+            <h2 data-i18n="myFarms">My farms</h2>
+            <button type="button" class="text-btn" id="addFarmBtn" data-i18n="addFarm">+ Add farm</button>
+          </div>
+          <p class="hint" data-i18n="farmsHubHint">Select a farm to open its season ledger.</p>
+          <ul class="farm-grid" id="farmGrid"></ul>
+        </div>
+      </main>
     </div>
 
     <div id="app" class="hidden">
@@ -89,6 +152,7 @@
           </div>
         </div>
         <div class="top-actions">
+          <button type="button" class="ghost-btn farms-back-btn" id="backToFarmsBtn" data-i18n="myFarms">My farms</button>
           <div class="lang-switch" role="group" aria-label="Language">
             <button type="button" class="lang-btn active" data-lang="en" id="langEn">EN</button>
             <button type="button" class="lang-btn" data-lang="ar" id="langAr">ع</button>
@@ -211,8 +275,8 @@
                 <input type="number" name="transport" min="0" step="0.01" value="0" placeholder="0.00" />
               </label>
               <label>
-                <span data-i18n="marketBuyer">Market / buyer</span>
-                <input type="text" name="market" data-i18n-placeholder="marketPh" placeholder="" />
+                <span data-i18n="merchant">Merchant</span>
+                <input type="text" name="merchant" required data-i18n-placeholder="merchantPh" placeholder="" />
               </label>
               <label>
                 <span data-i18n="notes">Notes</span>
@@ -228,10 +292,95 @@
             </div>
             <ul class="record-list" id="marketList"></ul>
           </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h2 data-i18n="merchantLedger">Merchants (season)</h2>
+            </div>
+            <ul class="category-list" id="merchantSummary"></ul>
+          </div>
+        </section>
+
+        <!-- PROCUREMENTS -->
+        <section class="view" data-view="procurements">
+          <div class="panel">
+            <div class="panel-head">
+              <h2 data-i18n="addProcurement">Add procurement</h2>
+            </div>
+            <form id="procurementForm" class="form">
+              <label>
+                <span data-i18n="date">Date</span>
+                <input type="date" name="date" required />
+              </label>
+              <label>
+                <span data-i18n="company">Company</span>
+                <input type="text" name="company" required data-i18n-placeholder="companyPh" placeholder="" />
+              </label>
+              <label>
+                <span data-i18n="category">Category</span>
+                <select name="category" required>
+                  <option value="fertilizer" data-i18n="catFertilizer">Fertilizer</option>
+                  <option value="pesticide" data-i18n="catPesticide">Pesticide</option>
+                  <option value="other" data-i18n="catOther">Other</option>
+                </select>
+              </label>
+              <label>
+                <span data-i18n="productType">Product / type</span>
+                <input type="text" name="productType" data-i18n-placeholder="productTypePh" placeholder="" />
+              </label>
+              <div class="row-2">
+                <label>
+                  <span data-i18n="quantity">Quantity</span>
+                  <input type="number" name="quantity" min="0" step="0.01" placeholder="0" />
+                </label>
+                <label>
+                  <span data-i18n="unit">Unit</span>
+                  <input type="text" name="unit" value="kg" data-i18n-placeholder="unitPh" placeholder="" />
+                </label>
+              </div>
+              <label>
+                <span data-i18n="amount">Amount</span>
+                <input type="number" name="amount" min="0" step="0.01" required placeholder="0.00" />
+              </label>
+              <label>
+                <span data-i18n="notes">Notes</span>
+                <input type="text" name="notes" data-i18n-placeholder="optional" placeholder="" />
+              </label>
+              <button type="submit" class="primary-btn" data-i18n="saveProcurement">Save procurement</button>
+            </form>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h2 data-i18n="procurements">Procurements</h2>
+              <span class="muted" id="procurementCount">0</span>
+            </div>
+            <ul class="record-list" id="procurementList"></ul>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h2 data-i18n="companyLedger">Companies (season)</h2>
+            </div>
+            <ul class="category-list" id="companySummary"></ul>
+          </div>
         </section>
 
         <!-- CALENDAR -->
         <section class="view" data-view="calendar">
+          <div class="panel">
+            <div class="panel-head">
+              <h2 data-i18n="periodReport">Period report</h2>
+            </div>
+            <form id="periodForm" class="form row-2 period-form">
+              <label>
+                <span data-i18n="dateFrom">From</span>
+                <input type="date" name="from" id="periodFrom" />
+              </label>
+              <label>
+                <span data-i18n="dateTo">To</span>
+                <input type="date" name="to" id="periodTo" />
+              </label>
+            </form>
+            <div id="periodSummary" class="period-summary"></div>
+          </div>
           <div class="panel">
             <div class="panel-head calendar-nav">
               <button type="button" class="icon-btn" id="prevMonth" data-i18n-aria="prevMonth" aria-label="Previous month">‹</button>
@@ -303,6 +452,10 @@
           <span>−</span>
           <small data-i18n="navExpenses">Expenses</small>
         </button>
+        <button type="button" class="nav-item" data-nav="procurements">
+          <span>◆</span>
+          <small data-i18n="navProcurements">Supply</small>
+        </button>
         <button type="button" class="nav-item" data-nav="market">
           <span>↗</span>
           <small data-i18n="navMarket">Market</small>
@@ -319,10 +472,10 @@
       <form method="dialog" id="settingsForm" class="form modal-form">
         <h2 data-i18n="settings">Settings</h2>
         <div class="farm-id-box">
-          <p class="muted" data-i18n="yourFarmId">Your Farm ID</p>
+          <p class="muted" data-i18n="yourFarmerId">Your FarmerID</p>
           <p class="farm-id-value" id="settingsFarmId">—</p>
           <div class="modal-actions">
-            <button type="button" class="ghost-btn" id="copyFarmIdBtn" data-i18n="copyFarmId">Copy Farm ID</button>
+            <button type="button" class="ghost-btn" id="copyFarmIdBtn" data-i18n="copyFarmerId">Copy FarmerID</button>
             <button type="button" class="ghost-btn" id="syncNowBtn" data-i18n="syncNow">Sync now</button>
             <button type="button" class="ghost-btn danger" id="logoutBtn" data-i18n="logout">Log out</button>
           </div>
@@ -340,7 +493,7 @@
         </label>
         <label>
           <span data-i18n="currencySymbol">Currency symbol</span>
-          <input type="text" name="currency" maxlength="4" placeholder="₪ / JD / $" />
+          <input type="text" name="currency" maxlength="4" placeholder="JD" />
         </label>
         <div class="modal-actions">
           <button type="button" class="ghost-btn" id="exportBtn" data-i18n="exportBackup">Export backup</button>
@@ -353,6 +506,28 @@
         <p class="hint" data-i18n="settingsHint">
           Cloud farm data is shared with anyone who has your Farm ID and password. Export a backup as extra safety.
         </p>
+      </form>
+    </dialog>
+
+    <dialog id="addFarmDialog">
+      <form id="addFarmForm" class="form modal-form">
+        <h2 data-i18n="addFarm">Add farm</h2>
+        <label>
+          <span data-i18n="farmName">Farm name</span>
+          <input type="text" name="name" required data-i18n-placeholder="farmNamePh" placeholder="" />
+        </label>
+        <label>
+          <span data-i18n="crop">Crop</span>
+          <input type="text" name="crop" data-i18n-placeholder="cropPh" placeholder="" />
+        </label>
+        <label>
+          <span data-i18n="startDate">Start date</span>
+          <input type="date" name="started_at" required />
+        </label>
+        <div class="modal-actions end">
+          <button type="submit" class="primary-btn" data-i18n="createFarm">Create farm</button>
+          <button type="button" class="ghost-btn" id="closeAddFarm" data-i18n="cancel">Cancel</button>
+        </div>
       </form>
     </dialog>
 
@@ -385,7 +560,7 @@
 
     <input type="file" id="importFile" accept="application/json" hidden />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="config.js?v=4"></script>
-    <script src="app.js?v=4"></script>
+    <script src="config.js?v=6"></script>
+    <script src="app.js?v=6"></script>
   </body>
 </html>

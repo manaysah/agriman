@@ -1,6 +1,5 @@
 /**
- * AgriMan Worker: /api/* cloud ledger + static site assets.
- * Bind D1 as env.DB after this Worker (not static-only) is deployed.
+ * AgriMan Worker: farmer accounts, multi-farm D1, /api/* + static assets.
  */
 
 const enc = new TextEncoder();
@@ -11,6 +10,7 @@ function json(data, status = 200) {
     headers: {
       "content-type": "application/json; charset=utf-8",
       "cache-control": "no-store",
+      "access-control-allow-origin": "*",
     },
   });
 }
@@ -49,35 +49,26 @@ function newToken() {
   return crypto.randomUUID();
 }
 
-function generateFarmId() {
+function generateFarmerId() {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   const bytes = crypto.getRandomValues(new Uint8Array(6));
   let body = "";
   for (let i = 0; i < 6; i++) body += alphabet[bytes[i] % alphabet.length];
-  return `AM-${body}`;
+  return `AgriBakMan-${body}`;
 }
 
-async function ensureSchema(db) {
-  await db
-    .prepare(
-      `CREATE TABLE IF NOT EXISTS farms (
-        farm_id TEXT PRIMARY KEY,
-        password_salt TEXT NOT NULL,
-        password_hash TEXT NOT NULL,
-        data TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      )`
-    )
-    .run();
-  await db
-    .prepare(
-      `CREATE TABLE IF NOT EXISTS sessions (
-        token TEXT PRIMARY KEY,
-        farm_id TEXT NOT NULL,
-        expires_at TEXT NOT NULL
-      )`
-    )
-    .run();
+function generateCropFarmId() {
+  return `F-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+}
+
+/** Accept AgriBakMan-XXX or legacy AM-XXX (maps to AgriBakMan-XXX). */
+function canonicalFarmerId(raw) {
+  const t = String(raw || "").trim();
+  if (!t) return "";
+  const u = t.toUpperCase();
+  if (u.startsWith("AM-")) return `AgriBakMan-${u.slice(3)}`;
+  if (u.startsWith("AGRIBAKMAN-")) return `AgriBakMan-${u.slice(11)}`;
+  return t;
 }
 
 function expiryIso(days = 180) {
@@ -92,132 +83,346 @@ async function readJson(request) {
   }
 }
 
-async function handleHealth(env) {
-  if (!env.DB) return json({ ok: false, error: "DB_NOT_BOUND" }, 503);
-  try {
-    await ensureSchema(env.DB);
-    return json({ ok: true, provider: "cloudflare-d1" });
-  } catch (e) {
-    return json({ ok: false, error: "DB_ERROR", detail: String(e) }, 503);
-  }
+async function tableHasColumn(db, table, column) {
+  const rows = await db.prepare(`PRAGMA table_info(${table})`).all();
+  const list = rows?.results || [];
+  return list.some((r) => r.name === column);
 }
 
-async function handleCreate(env, body) {
-  const password = String(body?.password || "");
-  if (password.length < 6) return err("WEAK_PASSWORD");
-  await ensureSchema(env.DB);
-
-  const data = body?.data && typeof body.data === "object" ? body.data : {};
-  const dataJson = JSON.stringify(data);
-  let farmId = "";
-  let lastDetail = "";
-
-  for (let i = 0; i < 8; i++) {
-    farmId = generateFarmId();
-    const salt = crypto.getRandomValues(new Uint8Array(16));
-    const passwordHash = await hashPassword(password, salt);
-    const updatedAt = new Date().toISOString();
-    try {
-      const insert = await env.DB.prepare(
-        `INSERT INTO farms (farm_id, password_salt, password_hash, data, updated_at)
-         VALUES (?, ?, ?, ?, ?)`
-      )
-        .bind(farmId, b64(salt), passwordHash, dataJson, updatedAt)
-        .run();
-      if (!insert?.success) {
-        lastDetail = JSON.stringify(insert);
-        continue;
-      }
-
-      const token = newToken();
-      const sess = await env.DB.prepare(
-        `INSERT INTO sessions (token, farm_id, expires_at) VALUES (?, ?, ?)`
-      )
-        .bind(token, farmId, expiryIso())
-        .run();
-      if (!sess?.success) {
-        lastDetail = JSON.stringify(sess);
-        continue;
-      }
-
-      return json({
-        farm_id: farmId,
-        token,
-        data,
-        updated_at: updatedAt,
-      });
-    } catch (e) {
-      lastDetail = String(e?.message || e);
-      // retry on collision / transient errors
-    }
-  }
-
-  return json({ error: "CREATE_FAILED", detail: lastDetail }, 500);
-}
-
-async function handleLogin(env, body) {
-  const farmId = String(body?.farmId || body?.farm_id || "")
-    .trim()
-    .toUpperCase();
-  const password = String(body?.password || "");
-  if (!farmId || password.length < 6) return err("BAD_LOGIN", 401);
-
-  await ensureSchema(env.DB);
-  const row = await env.DB.prepare(
-    `SELECT farm_id, password_salt, password_hash, data, updated_at FROM farms WHERE farm_id = ?`
-  )
-    .bind(farmId)
-    .first();
-
-  if (!row) return err("BAD_LOGIN", 401);
-  const hash = await hashPassword(password, fromB64(row.password_salt));
-  if (hash !== row.password_hash) return err("BAD_LOGIN", 401);
-
-  const token = newToken();
-  await env.DB.prepare(`INSERT INTO sessions (token, farm_id, expires_at) VALUES (?, ?, ?)`)
-    .bind(token, row.farm_id, expiryIso())
+async function ensureSchema(db) {
+  await db
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS farmers (
+        farmer_id TEXT PRIMARY KEY,
+        password_salt TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        email TEXT,
+        phone TEXT,
+        created_at TEXT NOT NULL
+      )`
+    )
     .run();
 
-  let data = {};
-  try {
-    data = JSON.parse(row.data || "{}");
-  } catch {
-    data = {};
-  }
+  await db
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS farmer_sessions (
+        token TEXT PRIMARY KEY,
+        farmer_id TEXT NOT NULL,
+        expires_at TEXT NOT NULL
+      )`
+    )
+    .run();
 
-  return json({
-    farm_id: row.farm_id,
-    token,
-    data,
-    updated_at: row.updated_at,
-  });
+  await db
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS crop_farms (
+        farm_id TEXT PRIMARY KEY,
+        farmer_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        crop TEXT,
+        started_at TEXT NOT NULL,
+        data TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )`
+    )
+    .run();
+
+  await db
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS app_meta (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      )`
+    )
+    .run();
+
+  await migrateLegacySingleFarm(db);
 }
 
-async function sessionFarm(env, token) {
+async function migrateLegacySingleFarm(db) {
+  const done = await db.prepare(`SELECT value FROM app_meta WHERE key = 'legacy_migrated'`).first();
+  if (done?.value === "1") return;
+
+  const hasLegacy = await tableHasColumn(db, "farms", "password_hash");
+  if (!hasLegacy) {
+    await db
+      .prepare(`INSERT OR REPLACE INTO app_meta (key, value) VALUES ('legacy_migrated', '1')`)
+      .run();
+    return;
+  }
+
+  const rows = await db
+    .prepare(`SELECT farm_id, password_salt, password_hash, data, updated_at FROM farms`)
+    .all();
+  const list = rows?.results || [];
+
+  for (const row of list) {
+    const legacyId = String(row.farm_id || "").toUpperCase();
+    const suffix = legacyId.startsWith("AM-") ? legacyId.slice(3) : legacyId.replace(/^AGRIBAKMAN-/, "");
+    const farmerId = `AgriBakMan-${suffix}`;
+    const existing = await db
+      .prepare(`SELECT farmer_id FROM farmers WHERE farmer_id = ?`)
+      .bind(farmerId)
+      .first();
+    if (!existing) {
+      await db
+        .prepare(
+          `INSERT INTO farmers (farmer_id, password_salt, password_hash, email, phone, created_at)
+           VALUES (?, ?, ?, NULL, NULL, ?)`
+        )
+        .bind(farmerId, row.password_salt, row.password_hash, row.updated_at || new Date().toISOString())
+        .run();
+    }
+
+    let data = {};
+    try {
+      data = JSON.parse(row.data || "{}");
+    } catch {
+      data = {};
+    }
+    const name = String(data?.settings?.seasonName || "My farm").slice(0, 120);
+    const cropFarmId = generateCropFarmId();
+    const startedAt = pickStartedAt(data);
+    await db
+      .prepare(
+        `INSERT INTO crop_farms (farm_id, farmer_id, name, crop, started_at, data, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
+      )
+      .bind(
+        cropFarmId,
+        farmerId,
+        name,
+        "",
+        startedAt,
+        JSON.stringify(data),
+        row.updated_at || new Date().toISOString()
+      )
+      .run();
+  }
+
+  await db.prepare(`DROP TABLE IF EXISTS sessions`).run();
+  await db.prepare(`DROP TABLE IF EXISTS farms`).run();
+  await db
+    .prepare(`INSERT OR REPLACE INTO app_meta (key, value) VALUES ('legacy_migrated', '1')`)
+    .run();
+}
+
+function pickStartedAt(data) {
+  const dates = [];
+  for (const e of data?.expenses || []) if (e?.date) dates.push(e.date);
+  for (const m of data?.markets || []) if (m?.date) dates.push(m.date);
+  dates.sort();
+  return dates[0] || new Date().toISOString().slice(0, 10);
+}
+
+function summarizeFarm(data) {
+  const expenses = (data?.expenses || []).reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  const revenue = (data?.markets || []).reduce((s, m) => s + (Number(m.revenue) || 0), 0);
+  const transport = (data?.markets || []).reduce((s, m) => s + (Number(m.transport) || 0), 0);
+  return {
+    expenses: expenses + transport,
+    revenue,
+    profit: revenue - expenses - transport,
+  };
+}
+
+async function sessionFarmer(db, token) {
   if (!token) return null;
-  await ensureSchema(env.DB);
-  const sess = await env.DB.prepare(
-    `SELECT token, farm_id, expires_at FROM sessions WHERE token = ?`
-  )
+  const sess = await db
+    .prepare(`SELECT token, farmer_id, expires_at FROM farmer_sessions WHERE token = ?`)
     .bind(token)
     .first();
   if (!sess) return null;
   if (new Date(sess.expires_at).getTime() < Date.now()) {
-    await env.DB.prepare(`DELETE FROM sessions WHERE token = ?`).bind(token).run();
+    await db.prepare(`DELETE FROM farmer_sessions WHERE token = ?`).bind(token).run();
     return null;
   }
   return sess;
 }
 
-async function handleLoad(env, body) {
-  const sess = await sessionFarm(env, body?.token);
-  if (!sess) return err("BAD_SESSION", 401);
+async function createFarmerSession(db, farmerId) {
+  const token = newToken();
+  await db
+    .prepare(`INSERT INTO farmer_sessions (token, farmer_id, expires_at) VALUES (?, ?, ?)`)
+    .bind(token, farmerId, expiryIso())
+    .run();
+  return token;
+}
+
+async function sendWelcomeEmail(env, { email, farmerId, password }) {
+  const apiKey = env.RESEND_API_KEY;
+  if (!apiKey || !email) return { sent: false, reason: "NO_EMAIL_OR_KEY" };
+  const from = env.EMAIL_FROM || "AgriMan <onboarding@resend.dev>";
+  const body = {
+    from,
+    to: [email],
+    subject: "Your AgriMan FarmerID",
+    text: `Welcome to AgriMan!\n\nFarmerID: ${farmerId}\nPassword: ${password}\n\nKeep these safe. You can log in on any device.`,
+  };
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const detail = await res.text();
+      return { sent: false, reason: detail.slice(0, 200) };
+    }
+    return { sent: true };
+  } catch (e) {
+    return { sent: false, reason: String(e?.message || e) };
+  }
+}
+
+async function handleHealth(env) {
+  if (!env.DB) return json({ ok: false, error: "DB_NOT_BOUND" }, 503);
+  try {
+    await ensureSchema(env.DB);
+    return json({ ok: true, provider: "cloudflare-d1", version: 2 });
+  } catch (e) {
+    return json({ ok: false, error: "DB_ERROR", detail: String(e) }, 503);
+  }
+}
+
+async function handleFarmerRegister(env, body) {
+  const password = String(body?.password || "");
+  const email = String(body?.email || "").trim().toLowerCase() || null;
+  const phone = String(body?.phone || "").trim() || null;
+  if (password.length < 6) return err("WEAK_PASSWORD");
+  if (!email && !phone) return err("CONTACT_REQUIRED");
+
+  await ensureSchema(env.DB);
+
+  let farmerId = "";
+  let lastDetail = "";
+  for (let i = 0; i < 8; i++) {
+    farmerId = generateFarmerId();
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const passwordHash = await hashPassword(password, salt);
+    const createdAt = new Date().toISOString();
+    try {
+      const insert = await env.DB.prepare(
+        `INSERT INTO farmers (farmer_id, password_salt, password_hash, email, phone, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      )
+        .bind(farmerId, b64(salt), passwordHash, email, phone, createdAt)
+        .run();
+      if (!insert?.success) {
+        lastDetail = JSON.stringify(insert);
+        continue;
+      }
+      const token = await createFarmerSession(env.DB, farmerId);
+      const emailResult = await sendWelcomeEmail(env, { email, farmerId, password });
+      return json({
+        farmer_id: farmerId,
+        token,
+        email_sent: emailResult.sent === true,
+        email_status: emailResult.sent ? "sent" : emailResult.reason || "skipped",
+      });
+    } catch (e) {
+      lastDetail = String(e?.message || e);
+    }
+  }
+  return json({ error: "REGISTER_FAILED", detail: lastDetail }, 500);
+}
+
+async function handleFarmerLogin(env, body) {
+  const password = String(body?.password || "");
+  const farmerId = canonicalFarmerId(
+    body?.farmerId || body?.farmer_id || body?.farmId || body?.farm_id
+  );
+  if (!farmerId || password.length < 6) return err("BAD_LOGIN", 401);
+
+  await ensureSchema(env.DB);
   const row = await env.DB.prepare(
-    `SELECT farm_id, data, updated_at FROM farms WHERE farm_id = ?`
+    `SELECT farmer_id, password_salt, password_hash FROM farmers WHERE farmer_id = ?`
   )
-    .bind(sess.farm_id)
+    .bind(farmerId)
     .first();
-  if (!row) return err("BAD_SESSION", 401);
+  if (!row) return err("BAD_LOGIN", 401);
+  const hash = await hashPassword(password, fromB64(row.password_salt));
+  if (hash !== row.password_hash) return err("BAD_LOGIN", 401);
+
+  const token = await createFarmerSession(env.DB, row.farmer_id);
+  return json({ farmer_id: row.farmer_id, token });
+}
+
+async function handleFarmsList(env, body) {
+  const sess = await sessionFarmer(env.DB, body?.token);
+  if (!sess) return err("BAD_SESSION", 401);
+  const rows = await env.DB.prepare(
+    `SELECT farm_id, name, crop, started_at, data, updated_at FROM crop_farms WHERE farmer_id = ? ORDER BY started_at DESC`
+  )
+    .bind(sess.farmer_id)
+    .all();
+  const farms = (rows?.results || []).map((r) => {
+    let data = {};
+    try {
+      data = JSON.parse(r.data || "{}");
+    } catch {
+      data = {};
+    }
+    const sum = summarizeFarm(data);
+    return {
+      farm_id: r.farm_id,
+      name: r.name,
+      crop: r.crop || "",
+      started_at: r.started_at,
+      updated_at: r.updated_at,
+      profit: sum.profit,
+      expenses: sum.expenses,
+      revenue: sum.revenue,
+    };
+  });
+  return json({ farmer_id: sess.farmer_id, token: sess.token, farms });
+}
+
+async function handleFarmsCreate(env, body) {
+  const sess = await sessionFarmer(env.DB, body?.token);
+  if (!sess) return err("BAD_SESSION", 401);
+  const name = String(body?.name || "Farm").trim().slice(0, 120) || "Farm";
+  const crop = String(body?.crop || "").trim().slice(0, 80);
+  const startedAt = String(body?.started_at || new Date().toISOString().slice(0, 10));
+  const data =
+    body?.data && typeof body.data === "object"
+      ? body.data
+      : {
+          settings: { seasonName: name, currency: "JD", language: "en" },
+          expenses: [],
+          markets: [],
+          plans: [],
+          procurements: [],
+        };
+  const farmId = generateCropFarmId();
+  const updatedAt = new Date().toISOString();
+  await env.DB.prepare(
+    `INSERT INTO crop_farms (farm_id, farmer_id, name, crop, started_at, data, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  )
+    .bind(farmId, sess.farmer_id, name, crop, startedAt, JSON.stringify(data), updatedAt)
+    .run();
+  return json({ farm_id: farmId, name, crop, started_at: startedAt, updated_at: updatedAt, data });
+}
+
+async function assertFarmAccess(db, farmerId, farmId) {
+  const row = await db
+    .prepare(`SELECT farm_id, data, updated_at, name, crop, started_at FROM crop_farms WHERE farm_id = ? AND farmer_id = ?`)
+    .bind(farmId, farmerId)
+    .first();
+  return row || null;
+}
+
+async function handleFarmsLoad(env, body) {
+  const sess = await sessionFarmer(env.DB, body?.token);
+  if (!sess) return err("BAD_SESSION", 401);
+  const farmId = String(body?.farm_id || body?.farmId || "");
+  if (!farmId) return err("BAD_FARM", 400);
+  const row = await assertFarmAccess(env.DB, sess.farmer_id, farmId);
+  if (!row) return err("BAD_FARM", 404);
   let data = {};
   try {
     data = JSON.parse(row.data || "{}");
@@ -226,24 +431,128 @@ async function handleLoad(env, body) {
   }
   return json({
     farm_id: row.farm_id,
+    name: row.name,
+    crop: row.crop,
+    started_at: row.started_at,
     token: sess.token,
+    farmer_id: sess.farmer_id,
     data,
     updated_at: row.updated_at,
   });
 }
 
-async function handleSave(env, body) {
-  const sess = await sessionFarm(env, body?.token);
+async function handleFarmsSave(env, body) {
+  const sess = await sessionFarmer(env.DB, body?.token);
   if (!sess) return err("BAD_SESSION", 401);
+  const farmId = String(body?.farm_id || body?.farmId || "");
+  if (!farmId) return err("BAD_FARM", 400);
+  const row = await assertFarmAccess(env.DB, sess.farmer_id, farmId);
+  if (!row) return err("BAD_FARM", 404);
   const data = body?.data && typeof body.data === "object" ? body.data : {};
   const updatedAt = new Date().toISOString();
-  await env.DB.prepare(`UPDATE farms SET data = ?, updated_at = ? WHERE farm_id = ?`)
-    .bind(JSON.stringify(data), updatedAt, sess.farm_id)
+  const name = String(body?.name || row.name || data?.settings?.seasonName || "Farm").slice(0, 120);
+  const crop = body?.crop != null ? String(body.crop).slice(0, 80) : row.crop;
+  await env.DB.prepare(
+    `UPDATE crop_farms SET data = ?, updated_at = ?, name = ?, crop = ? WHERE farm_id = ?`
+  )
+    .bind(JSON.stringify(data), updatedAt, name, crop, farmId)
     .run();
-  await env.DB.prepare(`UPDATE sessions SET expires_at = ? WHERE token = ?`)
+  await env.DB.prepare(`UPDATE farmer_sessions SET expires_at = ? WHERE token = ?`)
     .bind(expiryIso(), sess.token)
     .run();
-  return json({ farm_id: sess.farm_id, updated_at: updatedAt });
+  return json({ farm_id: farmId, updated_at: updatedAt });
+}
+
+/** Legacy single-farm API (login maps to farmer; load/save use first crop farm if farm_id omitted). */
+async function handleLegacyFarmLogin(env, body) {
+  const out = await handleFarmerLogin(env, body);
+  if (out.status !== 200) return out;
+  const parsed = await out.json();
+  const sess = await sessionFarmer(env.DB, parsed.token);
+  if (!sess) return err("BAD_SESSION", 401);
+  const first = await env.DB.prepare(
+    `SELECT farm_id, data, updated_at FROM crop_farms WHERE farmer_id = ? ORDER BY updated_at DESC LIMIT 1`
+  )
+    .bind(sess.farmer_id)
+    .first();
+  let data = {};
+  if (first) {
+    try {
+      data = JSON.parse(first.data || "{}");
+    } catch {
+      data = {};
+    }
+  }
+  return json({
+    farm_id: parsed.farmer_id,
+    farmer_id: parsed.farmer_id,
+    token: parsed.token,
+    data,
+    updated_at: first?.updated_at || new Date().toISOString(),
+    crop_farm_id: first?.farm_id || null,
+  });
+}
+
+async function handleLegacyFarmLoad(env, body) {
+  const sess = await sessionFarmer(env.DB, body?.token);
+  if (!sess) return err("BAD_SESSION", 401);
+  let farmId = String(body?.farm_id || body?.crop_farm_id || "");
+  if (!farmId) {
+    const first = await env.DB.prepare(
+      `SELECT farm_id FROM crop_farms WHERE farmer_id = ? ORDER BY updated_at DESC LIMIT 1`
+    )
+      .bind(sess.farmer_id)
+      .first();
+    farmId = first?.farm_id || "";
+  }
+  if (!farmId) return err("NO_FARM", 404);
+  return handleFarmsLoad(env, { token: body.token, farm_id: farmId });
+}
+
+async function handleLegacyFarmSave(env, body) {
+  const sess = await sessionFarmer(env.DB, body?.token);
+  if (!sess) return err("BAD_SESSION", 401);
+  let farmId = String(body?.farm_id || body?.crop_farm_id || "");
+  if (!farmId) {
+    const first = await env.DB.prepare(
+      `SELECT farm_id FROM crop_farms WHERE farmer_id = ? ORDER BY updated_at DESC LIMIT 1`
+    )
+      .bind(sess.farmer_id)
+      .first();
+    farmId = first?.farm_id || "";
+  }
+  if (!farmId) {
+    const created = await handleFarmsCreate(env, {
+      token: body.token,
+      name: body?.data?.settings?.seasonName || "Farm",
+      data: body?.data,
+    });
+    return created;
+  }
+  return handleFarmsSave(env, { ...body, farm_id: farmId });
+}
+
+async function handleLegacyFarmCreate(env, body) {
+  const password = String(body?.password || "");
+  if (password.length < 6) return err("WEAK_PASSWORD");
+  const reg = await handleFarmerRegister(env, { password, email: body?.email, phone: body?.phone });
+  if (reg.status !== 200) return reg;
+  const parsed = await reg.json();
+  const create = await handleFarmsCreate(env, {
+    token: parsed.token,
+    name: body?.data?.settings?.seasonName || "Farm",
+    data: body?.data,
+  });
+  if (create.status !== 200) return create;
+  const farm = await create.json();
+  return json({
+    farm_id: parsed.farmer_id,
+    farmer_id: parsed.farmer_id,
+    token: parsed.token,
+    data: farm.data,
+    updated_at: farm.updated_at,
+    crop_farm_id: farm.farm_id,
+  });
 }
 
 async function handleApi(request, env) {
@@ -266,23 +575,50 @@ async function handleApi(request, env) {
   }
 
   if (!env.DB) return err("DB_NOT_BOUND", 503);
-  if (parts[0] !== "farm" || request.method !== "POST") return err("NOT_FOUND", 404);
 
-  const body = await readJson(request);
-  if (!body) return err("BAD_JSON");
-
-  switch (parts[1]) {
-    case "create":
-      return handleCreate(env, body);
-    case "login":
-      return handleLogin(env, body);
-    case "load":
-      return handleLoad(env, body);
-    case "save":
-      return handleSave(env, body);
-    default:
-      return err("NOT_FOUND", 404);
+  if (parts[0] === "farmer" && request.method === "POST") {
+    const body = await readJson(request);
+    if (!body) return err("BAD_JSON");
+    if (parts[1] === "register") return handleFarmerRegister(env, body);
+    if (parts[1] === "login") return handleFarmerLogin(env, body);
+    return err("NOT_FOUND", 404);
   }
+
+  if (parts[0] === "farms" && request.method === "POST") {
+    const body = await readJson(request);
+    if (!body) return err("BAD_JSON");
+    switch (parts[1]) {
+      case "list":
+        return handleFarmsList(env, body);
+      case "create":
+        return handleFarmsCreate(env, body);
+      case "load":
+        return handleFarmsLoad(env, body);
+      case "save":
+        return handleFarmsSave(env, body);
+      default:
+        return err("NOT_FOUND", 404);
+    }
+  }
+
+  if (parts[0] === "farm" && request.method === "POST") {
+    const body = await readJson(request);
+    if (!body) return err("BAD_JSON");
+    switch (parts[1]) {
+      case "create":
+        return handleLegacyFarmCreate(env, body);
+      case "login":
+        return handleLegacyFarmLogin(env, body);
+      case "load":
+        return handleLegacyFarmLoad(env, body);
+      case "save":
+        return handleLegacyFarmSave(env, body);
+      default:
+        return err("NOT_FOUND", 404);
+    }
+  }
+
+  return err("NOT_FOUND", 404);
 }
 
 export default {
@@ -293,7 +629,20 @@ export default {
         return await handleApi(request, env);
       }
       if (env.ASSETS) {
-        return env.ASSETS.fetch(request);
+        const response = await env.ASSETS.fetch(request);
+        const path = url.pathname;
+        const isShell =
+          path === "/" ||
+          path.endsWith("/index.html") ||
+          path.endsWith("/app.js") ||
+          path.endsWith("/styles.css") ||
+          path.endsWith("/config.js") ||
+          path.endsWith("/sw.js");
+        if (!isShell || !response.ok) return response;
+        const headers = new Headers(response.headers);
+        headers.set("cache-control", "no-cache, no-store, must-revalidate");
+        headers.set("pragma", "no-cache");
+        return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
       }
       return new Response("ASSETS binding missing", { status: 500 });
     } catch (e) {

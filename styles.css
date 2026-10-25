@@ -670,7 +670,7 @@ html[dir="rtl"] .brand {
   transform: translateX(-50%);
   width: min(720px, 100%);
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 4px;
   padding: 8px 10px calc(8px + var(--safe-bottom));
   background: rgba(255, 250, 242, 0.92);
@@ -820,6 +820,60 @@ html[dir="rtl"] .auth-card h1 {
 
 .about-card .primary-btn {
   width: 100%;
+}
+
+.farms-hub {
+  min-height: 100vh;
+  padding-bottom: 24px;
+}
+
+.farms-hub-main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 12px 14px 32px;
+}
+
+.farm-grid {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.farm-card {
+  width: 100%;
+  text-align: start;
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--paper);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.farm-card strong {
+  font-size: 1.05rem;
+  color: var(--leaf);
+}
+
+.farms-back-btn {
+  font-size: 0.82rem;
+  padding: 6px 10px;
+}
+
+.period-summary {
+  margin-top: 12px;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.period-form {
+  margin-bottom: 0;
 }
 
 @media (min-width: 700px) {

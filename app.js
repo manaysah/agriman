@@ -1,7 +1,7 @@
 (() => {
   const STORAGE_KEY = "agriman-v1";
   const LEGACY_KEY = "farm-ledger-v1";
-  const SESSION_KEY = "agriman-session-v1";
+  const SESSION_KEY = "agriman-session-v2";
   const LOCAL_ONLY_KEY = "agriman-local-only";
 
   const EXPENSE_CATEGORY_KEYS = [
@@ -40,6 +40,9 @@
       saleAmount: "Sale amount (revenue)",
       transportFee: "Transport fee",
       marketBuyer: "Market / buyer",
+      merchant: "Merchant",
+      merchantPh: "Vegetable merchant name…",
+      merchantLedger: "Merchants (season)",
       saveMarketDay: "Save market day",
       marketTrips: "Market trips",
       expense: "Expense",
@@ -107,32 +110,74 @@
       spring: "Spring",
       summer: "Summer",
       fall: "Fall",
-      authTagline: "Shared farm ledger — Farm ID + password, synced safely in the cloud.",
+      authTagline: "Shared farm ledger — FarmerID + password, synced safely in the cloud.",
+      login: "Log in",
+      register: "Register",
+      email: "Email",
+      phone: "Phone",
+      contactHint: "Provide email or phone (or both).",
+      registerHint: "We’ll create your FarmerID (AgriBakMan-…) and email your credentials when possible.",
+      farmerId: "FarmerID",
+      yourFarmerId: "Your FarmerID",
+      copyFarmerId: "Copy FarmerID",
+      farmerRegistered: "Account created. Your FarmerID:",
+      emailSent: "Credentials emailed.",
+      emailNotSent: "Email not sent — save your FarmerID and password.",
+      myFarms: "My farms",
+      farmsHubHint: "Select a farm to open its season ledger.",
+      addFarm: "Add farm",
+      farmName: "Farm name",
+      farmNamePh: "North field",
+      crop: "Crop",
+      cropPh: "Tomatoes, olives…",
+      startDate: "Start date",
+      navProcurements: "Supply",
+      addProcurement: "Add procurement",
+      saveProcurement: "Save procurement",
+      procurements: "Procurements",
+      company: "Company",
+      companyPh: "Supplier company…",
+      productType: "Product / type",
+      productTypePh: "NPK, herbicide…",
+      companyLedger: "Companies (season)",
+      catFertilizer: "Fertilizer",
+      catPesticide: "Pesticide",
+      catOther: "Other",
+      periodReport: "Period report",
+      dateFrom: "From",
+      dateTo: "To",
+      periodProfit: "Profit in period",
+      byMerchant: "By merchant",
+      byCompany: "By company",
+      byVegetable: "By vegetable",
+      shipments: "shipments",
       cloudSetupNeeded:
         "Cloud sync needs a D1 database binding on Cloudflare (see SETUP-CLOUD.md). You can continue on this device only until then.",
       continueLocal: "Continue on this device only",
-      joinFarm: "Join farm",
+      joinFarm: "Log in",
       createFarm: "Create farm",
-      farmId: "Farm ID",
+      farmId: "FarmerID",
       password: "Password",
       confirmPassword: "Confirm password",
-      createFarmHint: "We’ll generate a Farm ID. Share the ID and password with your partner.",
+      createFarmHint: "We’ll create your FarmerID. Share it with your partner.",
       pleaseWait: "Please wait…",
-      yourFarmId: "Your Farm ID",
-      copyFarmId: "Copy Farm ID",
+      yourFarmId: "Your FarmerID",
+      copyFarmId: "Copy FarmerID",
       syncNow: "Sync now",
       logout: "Log out",
-      logoutConfirm: "Log out on this device? Cloud data stays safe — use Farm ID + password to return.",
+      logoutConfirm: "Log out on this device? Cloud data stays safe — use FarmerID + password to return.",
       passwordMismatch: "Passwords do not match.",
       syncOk: "Synced",
       syncSaving: "Saving to cloud…",
       syncError: "Cloud sync failed",
       syncLocal: "This device only",
       copied: "Copied",
-      authErrorGeneric: "Could not sign in. Check Farm ID and password.",
-      farmCreated: "Farm created. Share this Farm ID with your partner:",
+      authErrorGeneric: "Could not sign in. Check FarmerID and password.",
+      farmCreated: "Account created. Your FarmerID:",
       settingsHint:
-        "Cloud farm data is shared with anyone who has your Farm ID and password. Export a backup as extra safety.",
+        "Cloud data is shared with anyone who has your FarmerID and password. Export a backup as extra safety.",
+      contactRequired: "Add email or phone to register.",
+      merchantRequired: "Merchant name is required.",
       cats: {
         land: "Land / rent",
         seeds: "Seeds",
@@ -168,7 +213,52 @@
       saleAmount: "مبلغ البيع (إيراد)",
       transportFee: "أجرة النقل",
       marketBuyer: "السوق / المشتري",
+      merchant: "تاجر الخضار",
+      merchantPh: "اسم التاجر…",
+      merchantLedger: "التجار (الموسم)",
       saveMarketDay: "حفظ يوم السوق",
+      login: "تسجيل الدخول",
+      register: "تسجيل",
+      email: "البريد",
+      phone: "الهاتف",
+      contactHint: "أدخل البريد أو الهاتف (أو كليهما).",
+      registerHint: "سنُنشئ FarmerID (AgriBakMan-…) ونرسل بيانات الدخول بالبريد إن أمكن.",
+      farmerId: "FarmerID",
+      yourFarmerId: "FarmerID الخاص بك",
+      copyFarmerId: "نسخ FarmerID",
+      farmerRegistered: "تم إنشاء الحساب. FarmerID:",
+      emailSent: "تم إرسال البيانات بالبريد.",
+      emailNotSent: "لم يُرسل البريد — احفظ FarmerID وكلمة المرور.",
+      myFarms: "مزارعي",
+      farmsHubHint: "اختر مزرعة لفتح دفتر الموسم.",
+      addFarm: "إضافة مزرعة",
+      farmName: "اسم المزرعة",
+      farmNamePh: "الحقل الشمالي",
+      crop: "المحصول",
+      cropPh: "طماطم، زيتون…",
+      startDate: "تاريخ البدء",
+      navProcurements: "توريد",
+      addProcurement: "إضافة توريد",
+      saveProcurement: "حفظ التوريد",
+      procurements: "التوريدات",
+      company: "الشركة",
+      companyPh: "شركة المورد…",
+      productType: "المنتج / النوع",
+      productTypePh: "NPK، مبيد…",
+      companyLedger: "الشركات (الموسم)",
+      catFertilizer: "سماد",
+      catPesticide: "مبيد",
+      catOther: "أخرى",
+      periodReport: "تقرير الفترة",
+      dateFrom: "من",
+      dateTo: "إلى",
+      periodProfit: "الربح في الفترة",
+      byMerchant: "حسب التاجر",
+      byCompany: "حسب الشركة",
+      byVegetable: "حسب الخضار",
+      shipments: "شحنات",
+      contactRequired: "أضف البريد أو الهاتف للتسجيل.",
+      merchantRequired: "اسم التاجر مطلوب.",
       marketTrips: "رحلات السوق",
       expense: "مصروف",
       sale: "بيع",
@@ -286,6 +376,13 @@
     return (STRINGS[lang]?.cats?.[key] || STRINGS.en.cats[key] || key);
   }
 
+  function procCategoryLabel(key) {
+    if (key === "fertilizer") return t("catFertilizer");
+    if (key === "pesticide") return t("catPesticide");
+    if (key === "other") return t("catOther");
+    return labelCategory(key);
+  }
+
   function locale() {
     return state.settings.language === "ar" ? "ar" : "en";
   }
@@ -309,12 +406,13 @@
   const defaultState = () => ({
     settings: {
       seasonName: defaultSeasonName("en"),
-      currency: "₪",
+      currency: "JD",
       language: "en",
     },
     expenses: [],
     markets: [],
     plans: [],
+    procurements: [],
   });
 
   function loadState() {
@@ -335,6 +433,7 @@
         expenses: parsed.expenses || [],
         markets: parsed.markets || [],
         plans: parsed.plans || [],
+        procurements: parsed.procurements || [],
       };
     } catch {
       return defaultState();
@@ -350,15 +449,11 @@
     return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   }
 
-  function generateFarmId() {
-    const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    let body = "";
-    const bytes = crypto.getRandomValues(new Uint8Array(6));
-    for (let i = 0; i < 6; i++) body += alphabet[bytes[i] % alphabet.length];
-    return `AM-${body}`;
-  }
-
   let cloudReady = null; // null=unknown, true/false after probe
+
+  function merchantName(m) {
+    return String(m?.merchant || m?.market || "").trim();
+  }
 
   function supabaseConfigured() {
     const cfg = window.AGRIMAN_CONFIG || {};
@@ -393,19 +488,31 @@
     return cloudReady;
   }
 
-  async function apiFarm(action, body) {
-    const r = await fetch(`/api/farm/${action}`, {
+  async function apiPost(path, body) {
+    const r = await fetch(path, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body || {}),
     });
-    const json = await r.json().catch(() => ({}));
+    const data = await r.json().catch(() => ({}));
     if (!r.ok) {
-      const error = new Error(json.error || "REQUEST_FAILED");
-      error.code = json.error || "REQUEST_FAILED";
+      const error = new Error(data.error || "REQUEST_FAILED");
+      error.code = data.error || "REQUEST_FAILED";
       throw error;
     }
-    return json;
+    return data;
+  }
+
+  async function apiFarm(action, body) {
+    return apiPost(`/api/farm/${action}`, body);
+  }
+
+  async function apiFarmer(action, body) {
+    return apiPost(`/api/farmer/${action}`, body);
+  }
+
+  async function apiFarms(action, body) {
+    return apiPost(`/api/farms/${action}`, body);
   }
 
   function loadSession() {
@@ -436,6 +543,7 @@
       expenses: state.expenses,
       markets: state.markets,
       plans: state.plans,
+      procurements: state.procurements,
     };
   }
 
@@ -449,6 +557,7 @@
       expenses: incoming.expenses || [],
       markets: incoming.markets || [],
       plans: incoming.plans || [],
+      procurements: incoming.procurements || [],
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
@@ -459,7 +568,8 @@
     if (msg.includes("FARM_EXISTS")) return "Farm ID already exists. Try again.";
     if (msg.includes("WEAK_PASSWORD")) return "Password must be at least 6 characters.";
     if (msg.includes("BAD_SESSION")) return t("authErrorGeneric");
-    if (msg.includes("INVALID_FARM_ID")) return "Invalid Farm ID.";
+    if (msg.includes("INVALID_FARM_ID")) return "Invalid FarmerID.";
+    if (msg.includes("CONTACT_REQUIRED")) return t("contactRequired");
     if (msg.includes("DB_NOT_BOUND")) return t("cloudSetupNeeded");
     return t("authErrorGeneric");
   }
@@ -476,7 +586,7 @@
 
   function scheduleCloudSave() {
     const session = loadSession();
-    if (!session?.token || !cloudConfigured()) return;
+    if (!session?.token || !session?.cropFarmId || !cloudConfigured()) return;
     setSyncLabel(t("syncSaving"), "saving");
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
@@ -486,7 +596,7 @@
 
   async function pushToCloud() {
     const session = loadSession();
-    if (!session?.token || !cloudConfigured()) return false;
+    if (!session?.token || !session?.cropFarmId || !cloudConfigured()) return false;
     cloudBusy = true;
     try {
       let data;
@@ -499,13 +609,22 @@
         if (res.error) throw res.error;
         data = res.data;
       } else {
-        data = await apiFarm("save", { token: session.token, data: payloadFromState() });
+        if (session.cropFarmId) {
+          data = await apiFarms("save", {
+            token: session.token,
+            farm_id: session.cropFarmId,
+            data: payloadFromState(),
+          });
+        } else {
+          data = await apiFarm("save", { token: session.token, data: payloadFromState() });
+        }
       }
       if (data?.updated_at) {
         session.updatedAt = data.updated_at;
         saveSession(session);
       }
-      setSyncLabel(`${t("syncOk")} · ${session.farmId}`, "ok");
+      const label = session.farmerId || session.farmId || "";
+      setSyncLabel(label ? `${t("syncOk")} · ${label}` : t("syncOk"), "ok");
       return true;
     } catch {
       setSyncLabel(t("syncError"), "error");
@@ -526,13 +645,21 @@
         if (res.error) throw res.error;
         data = res.data;
       } else {
-        data = await apiFarm("load", { token: session.token });
+        if (session.cropFarmId) {
+          data = await apiFarms("load", { token: session.token, farm_id: session.cropFarmId });
+        } else {
+          data = await apiFarm("load", { token: session.token });
+        }
       }
       applyCloudData(data.data);
       session.updatedAt = data.updated_at;
-      session.farmId = data.farm_id;
+      if (data.farmer_id) session.farmerId = data.farmer_id;
+      if (data.farm_id && !String(data.farm_id).startsWith("AgriBakMan")) {
+        session.cropFarmId = data.farm_id;
+      }
       saveSession(session);
-      setSyncLabel(`${t("syncOk")} · ${session.farmId}`, "ok");
+      const label = session.farmerId || session.farmId || "";
+      setSyncLabel(label ? `${t("syncOk")} · ${label}` : t("syncOk"), "ok");
       applyI18n();
       renderAll();
       return true;
@@ -549,33 +676,102 @@
   function showAuthGate() {
     $("#authGate").classList.remove("hidden");
     $("#app").classList.add("hidden");
+    $("#farmsHub").classList.add("hidden");
     const configured = cloudConfigured();
     $("#authSetupWarn").classList.toggle("hidden", configured);
     $("#authTabs").classList.toggle("hidden", !configured);
-    $("#joinFarmForm").classList.toggle("hidden", !configured);
-    $("#createFarmForm").classList.add("hidden");
+    $("#loginForm").classList.toggle("hidden", !configured);
+    $("#registerForm").classList.add("hidden");
     if (configured) {
-      $$(".auth-tab").forEach((btn) => btn.classList.toggle("active", btn.dataset.authTab === "join"));
+      $$(".auth-tab").forEach((btn) => btn.classList.toggle("active", btn.dataset.authTab === "login"));
     }
     $("#authError").classList.add("hidden");
     applyI18n();
   }
 
+  function showFarmsHub() {
+    $("#authGate").classList.add("hidden");
+    $("#app").classList.add("hidden");
+    $("#farmsHub").classList.remove("hidden");
+    const session = loadSession();
+    const fid = session?.farmerId || session?.farmId || "—";
+    const hubLabel = $("#hubFarmerLabel");
+    if (hubLabel) hubLabel.textContent = fid;
+    applyI18n();
+    refreshFarmGrid().catch(() => {});
+  }
+
   function showAppShell() {
     $("#authGate").classList.add("hidden");
+    $("#farmsHub").classList.add("hidden");
     $("#app").classList.remove("hidden");
     const session = loadSession();
-    if (session?.farmId) setSyncLabel(`${t("syncOk")} · ${session.farmId}`, "ok");
+    const label = session?.farmerId || session?.farmId;
+    if (label) setSyncLabel(`${t("syncOk")} · ${label}`, "ok");
     else if (isLocalOnly()) setSyncLabel(t("syncLocal"), "local");
     else setSyncLabel("", "");
   }
 
   function setAuthBusy(on) {
     $("#authBusy").classList.toggle("hidden", !on);
-    ["#joinFarmForm button[type=submit]", "#createFarmForm button[type=submit]"].forEach((sel) => {
+    ["#loginForm button[type=submit]", "#registerForm button[type=submit]"].forEach((sel) => {
       const btn = $(sel);
       if (btn) btn.disabled = on;
     });
+  }
+
+  async function refreshFarmGrid() {
+    const grid = $("#farmGrid");
+    if (!grid) return;
+    const session = loadSession();
+    if (!session?.token || isLocalOnly()) {
+      grid.innerHTML = `<li class="muted">${escapeHtml(t("syncLocal"))}</li>`;
+      return;
+    }
+    let data;
+    try {
+      data = await apiFarms("list", { token: session.token });
+    } catch {
+      grid.innerHTML = `<li class="muted">${escapeHtml(t("syncError"))}</li>`;
+      return;
+    }
+    if (data.farmer_id) {
+      session.farmerId = data.farmer_id;
+      saveSession(session);
+    }
+    const farms = data.farms || [];
+    if (!farms.length) {
+      grid.innerHTML = `<li class="muted">${escapeHtml(t("farmsHubHint"))}</li>`;
+      return;
+    }
+    grid.innerHTML = farms
+      .map(
+        (f) => `
+      <li>
+        <button type="button" class="farm-card" data-open-farm="${escapeHtml(f.farm_id)}">
+          <strong>${escapeHtml(f.name)}</strong>
+          <span class="muted">${escapeHtml(f.crop || "—")} · ${escapeHtml(f.started_at || "")}</span>
+          <span>${money(f.profit)} ${t("seasonProfit").toLowerCase()}</span>
+          <span class="muted">${t("expenses")}: ${money(f.expenses)}</span>
+        </button>
+      </li>`
+      )
+      .join("");
+  }
+
+  async function openCropFarm(farmId) {
+    const session = loadSession();
+    if (!session?.token) return;
+    session.cropFarmId = farmId;
+    saveSession(session);
+    const data = await apiFarms("load", { token: session.token, farm_id: farmId });
+    applyCloudData(data.data);
+    session.updatedAt = data.updated_at;
+    saveSession(session);
+    showAppShell();
+    applyI18n();
+    fillDefaultDates();
+    renderAll();
   }
 
   function showAuthError(message) {
@@ -585,11 +781,21 @@
   }
 
   async function enterAppFromSession() {
-    showAppShell();
     applyI18n();
     fillDefaultDates();
-    renderAll();
-    if (loadSession()?.token) await pullFromCloud();
+    const session = loadSession();
+    if (isLocalOnly() || !session?.token) {
+      showAppShell();
+      renderAll();
+      return;
+    }
+    if (session.cropFarmId) {
+      showAppShell();
+      renderAll();
+      await pullFromCloud();
+      return;
+    }
+    showFarmsHub();
   }
 
   function todayISO() {
@@ -685,15 +891,17 @@
 
   function totals() {
     const expenseTotal = state.expenses.reduce((s, e) => s + e.amount, 0);
+    const procurementTotal = (state.procurements || []).reduce((s, p) => s + (Number(p.amount) || 0), 0);
     const transportOnMarket = state.markets.reduce((s, m) => s + (m.transport || 0), 0);
     const revenue = state.markets.reduce((s, m) => s + m.revenue, 0);
     const transportExpense = state.expenses
       .filter((e) => e.category === "transport")
       .reduce((s, e) => s + e.amount, 0);
     const transport = transportOnMarket + transportExpense;
-    const allCosts = expenseTotal + transportOnMarket;
+    const allCosts = expenseTotal + transportOnMarket + procurementTotal;
     return {
       expenseTotal,
+      procurementTotal,
       transportOnMarket,
       transport,
       revenue,
@@ -701,6 +909,13 @@
       profit: revenue - allCosts,
       marketDays: new Set(state.markets.map((m) => m.date)).size,
     };
+  }
+
+  function inDateRange(date, from, to) {
+    if (!date) return false;
+    if (from && date < from) return false;
+    if (to && date > to) return false;
+    return true;
   }
 
   function categorySpend() {
@@ -727,7 +942,7 @@
         id: m.id,
         date: m.date,
         title: m.product,
-        meta: m.market || t("marketSale"),
+        meta: merchantName(m) || t("marketSale"),
         amount: m.revenue,
         kind: "revenue",
       })),
@@ -825,7 +1040,7 @@
       <li class="record-item">
         <span class="title">${escapeHtml(m.product)}</span>
         <span class="amount revenue">+${money(m.revenue)}</span>
-        <span class="meta">${m.date} · ${qty}${escapeHtml(m.market || t("market"))}${transport}${
+        <span class="meta">${m.date} · ${qty}${escapeHtml(merchantName(m) || t("market"))}${transport}${
           m.notes ? ` · ${escapeHtml(m.notes)}` : ""
         }</span>
         <div class="actions">
@@ -834,6 +1049,164 @@
       </li>`;
       })
       .join("");
+    renderMerchantSummary();
+  }
+
+  function renderMerchantSummary() {
+    const el = $("#merchantSummary");
+    if (!el) return;
+    const map = {};
+    state.markets.forEach((m) => {
+      const name = merchantName(m) || t("market");
+      if (!map[name]) map[name] = { shipments: 0, revenue: 0, transport: 0, qty: {} };
+      const row = map[name];
+      row.shipments += 1;
+      row.revenue += Number(m.revenue) || 0;
+      row.transport += Number(m.transport) || 0;
+      const prod = m.product || "—";
+      const q = Number(m.quantity) || 0;
+      row.qty[prod] = (row.qty[prod] || 0) + q;
+    });
+    const entries = Object.entries(map).sort((a, b) => b[1].revenue - a[1].revenue);
+    if (!entries.length) {
+      el.innerHTML = `<li class="empty">${t("noMarketTrips")}</li>`;
+      return;
+    }
+    el.innerHTML = entries
+      .map(([name, row]) => {
+        const qtyBits = Object.entries(row.qty)
+          .filter(([, v]) => v > 0)
+          .map(([p, v]) => `${escapeHtml(p)}: ${v}`)
+          .join(", ");
+        return `<li class="category-item">
+          <span class="title">${escapeHtml(name)}</span>
+          <span class="amount revenue">${money(row.revenue)}</span>
+          <span class="meta">${row.shipments} ${t("shipments")}${qtyBits ? ` · ${qtyBits}` : ""}${
+          row.transport ? ` · ${t("transport")} ${money(row.transport)}` : ""
+        }</span>
+        </li>`;
+      })
+      .join("");
+  }
+
+  function renderProcurements() {
+    const list = $("#procurementList");
+    if (!list) return;
+    const sorted = [...(state.procurements || [])].sort((a, b) => (a.date < b.date ? 1 : -1));
+    const count = $("#procurementCount");
+    if (count) count.textContent = `${sorted.length}`;
+    if (!sorted.length) {
+      list.innerHTML = `<li class="empty">${t("procurements")}: —</li>`;
+    } else {
+      list.innerHTML = sorted
+        .map(
+          (p) => `
+      <li class="record-item">
+        <span class="title">${escapeHtml(p.company)} · ${escapeHtml(procCategoryLabel(p.category))}</span>
+        <span class="amount expense">−${money(p.amount)}</span>
+        <span class="meta">${p.date}${p.productType ? ` · ${escapeHtml(p.productType)}` : ""}${
+            p.quantity != null && p.quantity !== ""
+              ? ` · ${p.quantity}${p.unit ? ` ${escapeHtml(p.unit)}` : ""}`
+              : ""
+          }</span>
+        <div class="actions">
+          <button type="button" data-del-procurement="${p.id}">${t("delete")}</button>
+        </div>
+      </li>`
+        )
+        .join("");
+    }
+    renderCompanySummary();
+  }
+
+  function renderCompanySummary() {
+    const el = $("#companySummary");
+    if (!el) return;
+    const map = {};
+    (state.procurements || []).forEach((p) => {
+      const name = p.company || "—";
+      if (!map[name]) map[name] = { total: 0, byType: {} };
+      map[name].total += Number(p.amount) || 0;
+      const key = p.category || "other";
+      map[name].byType[key] = (map[name].byType[key] || 0) + (Number(p.quantity) || 0);
+    });
+    const entries = Object.entries(map).sort((a, b) => b[1].total - a[1].total);
+    if (!entries.length) {
+      el.innerHTML = `<li class="empty">—</li>`;
+      return;
+    }
+    el.innerHTML = entries
+      .map(
+        ([name, row]) => `<li class="category-item">
+        <span class="title">${escapeHtml(name)}</span>
+        <span class="amount expense">${money(row.total)}</span>
+      </li>`
+      )
+      .join("");
+  }
+
+  function renderPeriodReport() {
+    const box = $("#periodSummary");
+    if (!box) return;
+    const from = $("#periodFrom")?.value || "";
+    const to = $("#periodTo")?.value || "";
+    const expenses = state.expenses.filter((e) => inDateRange(e.date, from, to));
+    const markets = state.markets.filter((m) => inDateRange(m.date, from, to));
+    const procs = (state.procurements || []).filter((p) => inDateRange(p.date, from, to));
+    const revenue = markets.reduce((s, m) => s + (Number(m.revenue) || 0), 0);
+    const transport = markets.reduce((s, m) => s + (Number(m.transport) || 0), 0);
+    const expSum = expenses.reduce((s, e) => s + e.amount, 0);
+    const procSum = procs.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+    const profit = revenue - expSum - transport - procSum;
+
+    const byMerchant = {};
+    markets.forEach((m) => {
+      const k = merchantName(m) || "—";
+      if (!byMerchant[k]) byMerchant[k] = { revenue: 0, transport: 0 };
+      byMerchant[k].revenue += Number(m.revenue) || 0;
+      byMerchant[k].transport += Number(m.transport) || 0;
+    });
+    const byCompany = {};
+    procs.forEach((p) => {
+      const k = p.company || "—";
+      byCompany[k] = (byCompany[k] || 0) + (Number(p.amount) || 0);
+    });
+    const byVeg = {};
+    markets.forEach((m) => {
+      const k = m.product || "—";
+      if (!byVeg[k]) byVeg[k] = { revenue: 0, transport: 0 };
+      byVeg[k].revenue += Number(m.revenue) || 0;
+      byVeg[k].transport += Number(m.transport) || 0;
+    });
+
+    const section = (title, rows) => {
+      if (!rows.length) return "";
+      return `<p class="eyebrow">${escapeHtml(title)}</p><ul class="category-list">${rows.join("")}</ul>`;
+    };
+    const merchRows = Object.entries(byMerchant).map(
+      ([n, v]) =>
+        `<li class="category-item"><span class="title">${escapeHtml(n)}</span><span class="amount">${money(
+          v.revenue - v.transport
+        )}</span></li>`
+    );
+    const compRows = Object.entries(byCompany).map(
+      ([n, v]) =>
+        `<li class="category-item"><span class="title">${escapeHtml(n)}</span><span class="amount expense">${money(v)}</span></li>`
+    );
+    const vegRows = Object.entries(byVeg).map(
+      ([n, v]) =>
+        `<li class="category-item"><span class="title">${escapeHtml(n)}</span><span class="amount">${money(
+          v.revenue - v.transport
+        )}</span></li>`
+    );
+
+    box.innerHTML = `
+      <p><strong>${t("periodProfit")}:</strong> ${money(profit)}</p>
+      <p class="muted">${t("revenue")}: ${money(revenue)} · ${t("expenses")}: ${money(expSum + procSum + transport)}</p>
+      ${section(t("byMerchant"), merchRows)}
+      ${section(t("byCompany"), compRows)}
+      ${section(t("byVegetable"), vegRows)}
+    `;
   }
 
   function monthMatrix(year, month) {
@@ -891,6 +1264,7 @@
     $("#calendarGrid").innerHTML = dows + cells;
     renderDayDetail();
     renderPlans();
+    renderPeriodReport();
   }
 
   function renderDayDetail() {
@@ -933,7 +1307,7 @@
           <span class="title">${escapeHtml(m.product)}</span>
           <span class="amount revenue">+${money(m.revenue)}</span>
           <span class="meta">${m.transport ? `${t("transport")} ${money(m.transport)} · ` : ""}${
-            escapeHtml(m.market || t("sale"))
+            escapeHtml(merchantName(m) || t("sale"))
           }</span>
         </li>`
       ),
@@ -979,6 +1353,8 @@
     renderHome();
     renderExpenses();
     renderMarket();
+    renderProcurements();
+    renderPeriodReport();
     if ($('.view.active[data-view="calendar"]')) renderCalendar();
   }
 
@@ -1037,7 +1413,8 @@
       unit: String(fd.get("unit") || "").trim(),
       revenue: parseAmount(fd.get("revenue")),
       transport: parseAmount(fd.get("transport")),
-      market: String(fd.get("market") || "").trim(),
+      merchant: String(fd.get("merchant") || "").trim(),
+      market: String(fd.get("merchant") || "").trim(),
       notes: String(fd.get("notes") || "").trim(),
     });
     saveState();
@@ -1072,6 +1449,18 @@
       renderCalendar();
       return;
     }
+    const proc = e.target.closest("[data-del-procurement]");
+    if (proc) {
+      state.procurements = (state.procurements || []).filter((x) => x.id !== proc.dataset.delProcurement);
+      saveState();
+      renderAll();
+      return;
+    }
+    const farmBtn = e.target.closest("[data-open-farm]");
+    if (farmBtn) {
+      openCropFarm(farmBtn.dataset.openFarm).catch(() => showAuthError(t("syncError")));
+      return;
+    }
     const day = e.target.closest("[data-day]");
     if (day) {
       selectedDay = day.dataset.day;
@@ -1094,7 +1483,8 @@
     form.currency.value = state.settings.currency;
     form.language.value = state.settings.language || "en";
     const session = loadSession();
-    $("#settingsFarmId").textContent = session?.farmId || (isLocalOnly() ? t("syncLocal") : "—");
+    $("#settingsFarmId").textContent =
+      session?.farmerId || session?.farmId || (isLocalOnly() ? t("syncLocal") : "—");
     $("#settingsDialog").showModal();
   });
 
@@ -1118,12 +1508,13 @@
 
   $("#copyFarmIdBtn").addEventListener("click", async () => {
     const session = loadSession();
-    if (!session?.farmId) return;
+    const fid = session?.farmerId || session?.farmId;
+    if (!fid) return;
     try {
-      await navigator.clipboard.writeText(session.farmId);
+      await navigator.clipboard.writeText(fid);
       setSyncLabel(t("copied"), "ok");
     } catch {
-      prompt(t("yourFarmId"), session.farmId);
+      prompt(t("yourFarmerId"), fid);
     }
   });
 
@@ -1141,6 +1532,84 @@
     $("#settingsDialog").close();
     showAuthGate();
   });
+
+  $("#hubLogoutBtn")?.addEventListener("click", () => {
+    if (!confirm(t("logoutConfirm"))) return;
+    saveSession(null);
+    setLocalOnly(false);
+    showAuthGate();
+  });
+
+  $("#backToFarmsBtn")?.addEventListener("click", async () => {
+    await pushToCloud().catch(() => {});
+    const session = loadSession();
+    if (session) {
+      delete session.cropFarmId;
+      saveSession(session);
+    }
+    showFarmsHub();
+  });
+
+  $("#addFarmBtn")?.addEventListener("click", () => {
+    const form = $("#addFarmForm");
+    form.reset();
+    form.started_at.value = todayISO();
+    $("#addFarmDialog").showModal();
+  });
+
+  $("#closeAddFarm")?.addEventListener("click", () => $("#addFarmDialog").close());
+
+  $("#addFarmForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const session = loadSession();
+    if (!session?.token) return;
+    const fd = new FormData(e.target);
+    const name = String(fd.get("name") || "").trim();
+    const crop = String(fd.get("crop") || "").trim();
+    const startedAt = String(fd.get("started_at") || todayISO());
+    const fresh = defaultState();
+    fresh.settings.seasonName = name;
+    fresh.settings.language = state.settings.language || "en";
+    try {
+      await apiFarms("create", {
+        token: session.token,
+        name,
+        crop,
+        started_at: startedAt,
+        data: fresh,
+      });
+      $("#addFarmDialog").close();
+      await refreshFarmGrid();
+    } catch {
+      showAuthError(t("syncError"));
+    }
+  });
+
+  $("#procurementForm")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    if (!state.procurements) state.procurements = [];
+    state.procurements.push({
+      id: uid(),
+      date: fd.get("date"),
+      company: String(fd.get("company") || "").trim(),
+      category: fd.get("category"),
+      productType: String(fd.get("productType") || "").trim(),
+      quantity: fd.get("quantity") === "" ? null : parseAmount(fd.get("quantity")),
+      unit: String(fd.get("unit") || "").trim(),
+      amount: parseAmount(fd.get("amount")),
+      notes: String(fd.get("notes") || "").trim(),
+    });
+    saveState();
+    e.target.reset();
+    e.target.unit.value = "kg";
+    fillDefaultDates();
+    renderAll();
+    setView("procurements");
+  });
+
+  $("#periodFrom")?.addEventListener("change", renderPeriodReport);
+  $("#periodTo")?.addEventListener("change", renderPeriodReport);
 
   $("#exportBtn").addEventListener("click", () => {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
@@ -1166,9 +1635,9 @@
   $$(".auth-tab").forEach((btn) => {
     btn.addEventListener("click", () => {
       $$(".auth-tab").forEach((b) => b.classList.toggle("active", b === btn));
-      const create = btn.dataset.authTab === "create";
-      $("#joinFarmForm").classList.toggle("hidden", create);
-      $("#createFarmForm").classList.toggle("hidden", !create);
+      const reg = btn.dataset.authTab === "register";
+      $("#loginForm").classList.toggle("hidden", reg);
+      $("#registerForm").classList.toggle("hidden", !reg);
       $("#authError").classList.add("hidden");
     });
   });
@@ -1179,31 +1648,22 @@
     enterAppFromSession();
   });
 
-  $("#joinFarmForm").addEventListener("submit", async (e) => {
+  $("#loginForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     $("#authError").classList.add("hidden");
     if (!cloudConfigured()) return showAuthError(t("cloudSetupNeeded"));
     const fd = new FormData(e.target);
     setAuthBusy(true);
     try {
-      let data;
-      const sb = getSupabase();
-      if (sb) {
-        const res = await sb.rpc("login_farm", {
-          p_farm_id: String(fd.get("farmId") || "").trim(),
-          p_password: String(fd.get("password") || ""),
-        });
-        if (res.error) throw res.error;
-        data = res.data;
-      } else {
-        data = await apiFarm("login", {
-          farmId: String(fd.get("farmId") || "").trim(),
-          password: String(fd.get("password") || ""),
-        });
-      }
+      const data = await apiFarmer("login", {
+        farmerId: String(fd.get("farmerId") || "").trim(),
+        password: String(fd.get("password") || ""),
+      });
       setLocalOnly(false);
-      saveSession({ farmId: data.farm_id, token: data.token, updatedAt: data.updated_at });
-      applyCloudData(data.data);
+      saveSession({
+        farmerId: data.farmer_id,
+        token: data.token,
+      });
       await enterAppFromSession();
     } catch (err) {
       showAuthError(mapAuthError(err));
@@ -1212,7 +1672,7 @@
     }
   });
 
-  $("#createFarmForm").addEventListener("submit", async (e) => {
+  $("#registerForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     $("#authError").classList.add("hidden");
     if (!cloudConfigured()) return showAuthError(t("cloudSetupNeeded"));
@@ -1220,42 +1680,16 @@
     const password = String(fd.get("password") || "");
     const confirm = String(fd.get("confirm") || "");
     if (password !== confirm) return showAuthError(t("passwordMismatch"));
+    const email = String(fd.get("email") || "").trim();
+    const phone = String(fd.get("phone") || "").trim();
+    if (!email && !phone) return showAuthError(t("contactRequired"));
     setAuthBusy(true);
     try {
-      const fresh = defaultState();
-      fresh.settings.language = state.settings.language || "en";
-      fresh.settings.seasonName = defaultSeasonName(fresh.settings.language);
-      const payload = {
-        settings: fresh.settings,
-        expenses: [],
-        markets: [],
-        plans: [],
-      };
-      let created;
-      const sb = getSupabase();
-      if (sb) {
-        let lastError = null;
-        for (let i = 0; i < 5; i++) {
-          const res = await sb.rpc("create_farm", {
-            p_farm_id: generateFarmId(),
-            p_password: password,
-            p_data: payload,
-          });
-          if (!res.error) {
-            created = res.data;
-            break;
-          }
-          lastError = res.error;
-          if (!String(res.error.message || "").includes("FARM_EXISTS")) break;
-        }
-        if (!created) throw lastError || new Error("FARM_EXISTS");
-      } else {
-        created = await apiFarm("create", { password, data: payload });
-      }
+      const data = await apiFarmer("register", { password, email, phone });
       setLocalOnly(false);
-      saveSession({ farmId: created.farm_id, token: created.token, updatedAt: created.updated_at });
-      applyCloudData(created.data);
-      alert(`${t("farmCreated")}\n${created.farm_id}`);
+      saveSession({ farmerId: data.farmer_id, token: data.token });
+      const emailNote = data.email_sent ? t("emailSent") : t("emailNotSent");
+      alert(`${t("farmerRegistered")}\n${data.farmer_id}\n\n${emailNote}`);
       await enterAppFromSession();
     } catch (err) {
       showAuthError(mapAuthError(err));
@@ -1265,7 +1699,8 @@
   });
 
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden && loadSession()?.token && !cloudBusy) {
+    const session = loadSession();
+    if (!document.hidden && session?.token && session?.cropFarmId && !cloudBusy) {
       pullFromCloud().catch(() => {});
     }
   });
@@ -1296,8 +1731,21 @@
     renderCalendar();
   });
 
+  const SHELL_VERSION = "6";
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("./sw.js").catch(() => {});
+    navigator.serviceWorker.register(`./sw.js?v=${SHELL_VERSION}`).then((reg) => {
+      reg.update();
+      if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
+      reg.addEventListener("updatefound", () => {
+        const next = reg.installing;
+        if (!next) return;
+        next.addEventListener("statechange", () => {
+          if (next.state === "installed" && navigator.serviceWorker.controller) {
+            next.postMessage({ type: "SKIP_WAITING" });
+          }
+        });
+      });
+    }).catch(() => {});
   }
 
   (async function boot() {
@@ -1306,10 +1754,7 @@
     await probeCloud();
     const session = loadSession();
     if (session?.token && cloudConfigured()) {
-      showAppShell();
-      renderAll();
-      const ok = await pullFromCloud();
-      if (!ok && !loadSession()) return;
+      await enterAppFromSession();
       return;
     }
     if (isLocalOnly() && !cloudConfigured()) {

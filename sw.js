@@ -1,4 +1,4 @@
-const CACHE = "agriman-v4";
+const CACHE = "agriman-v6";
 const ASSETS = ["./logo.jpg", "./manifest.json", "./icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -8,37 +8,38 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
-    )
+    caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k)))).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-// Network-first for app shell so cloud/UI updates are not stuck on old cache
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
+
+function isAppShellPath(pathname) {
+  return (
+    pathname.endsWith("/") ||
+    pathname.endsWith("/index.html") ||
+    pathname.endsWith("/app.js") ||
+    pathname.endsWith("/styles.css") ||
+    pathname.endsWith("/config.js") ||
+    pathname.endsWith("/sw.js")
+  );
+}
+
+// Network-first for app shell; do not serve stale HTML/JS/CSS from cache on update.
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   if (url.pathname.startsWith("/api/")) {
     event.respondWith(fetch(event.request));
     return;
   }
-  const isAppShell =
-    url.pathname.endsWith("/") ||
-    url.pathname.endsWith("/index.html") ||
-    url.pathname.endsWith("/app.js") ||
-    url.pathname.endsWith("/styles.css") ||
-    url.pathname.endsWith("/config.js") ||
-    url.pathname.endsWith("/sw.js");
 
-  if (isAppShell) {
+  if (isAppShellPath(url.pathname)) {
     event.respondWith(
-      fetch(event.request)
-        .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((cache) => cache.put(event.request, copy));
-          return res;
-        })
-        .catch(() => caches.match(event.request))
+      fetch(event.request, { cache: "no-store" }).catch(() => caches.match(event.request))
     );
     return;
   }
