@@ -217,12 +217,14 @@ function pickStartedAt(data) {
 
 function summarizeFarm(data) {
   const expenses = (data?.expenses || []).reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  const procurements = (data?.procurements || []).reduce((s, p) => s + (Number(p.amount) || 0), 0);
   const revenue = (data?.markets || []).reduce((s, m) => s + (Number(m.revenue) || 0), 0);
   const transport = (data?.markets || []).reduce((s, m) => s + (Number(m.transport) || 0), 0);
+  const allCosts = expenses + procurements + transport;
   return {
-    expenses: expenses + transport,
+    expenses: allCosts,
     revenue,
-    profit: revenue - expenses - transport,
+    profit: revenue - allCosts,
   };
 }
 
@@ -249,15 +251,42 @@ async function createFarmerSession(db, farmerId) {
   return token;
 }
 
+function escapeHtml(str) {
+  return String(str)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
 async function sendWelcomeEmail(env, { email, farmerId, password }) {
   const apiKey = env.RESEND_API_KEY;
-  if (!apiKey || !email) return { sent: false, reason: "NO_EMAIL_OR_KEY" };
+  if (!apiKey) return { sent: false, reason: "RESEND_NOT_CONFIGURED" };
+  if (!email) return { sent: false, reason: "NO_EMAIL" };
   const from = env.EMAIL_FROM || "AgriMan <onboarding@resend.dev>";
+  const text = [
+    "Welcome to AgriMan!",
+    "",
+    `FarmerID: ${farmerId}`,
+    `Password: ${password}`,
+    "",
+    "Log in at https://agriman.agribakr.workers.dev/",
+    "",
+    "Keep these credentials safe. Anyone with your FarmerID and password can access your farms.",
+  ].join("\n");
+  const html = `<!DOCTYPE html><html><body style="font-family:system-ui,sans-serif;line-height:1.5;color:#1c1712">
+<p>Welcome to <strong>AgriMan</strong>!</p>
+<p><strong>FarmerID:</strong> ${escapeHtml(farmerId)}<br/>
+<strong>Password:</strong> ${escapeHtml(password)}</p>
+<p><a href="https://agriman.agribakr.workers.dev/">Open AgriMan</a></p>
+<p style="color:#6d6458;font-size:14px;">Keep these credentials safe. Anyone with your FarmerID and password can access your farms.</p>
+</body></html>`;
   const body = {
     from,
     to: [email],
-    subject: "Your AgriMan FarmerID",
-    text: `Welcome to AgriMan!\n\nFarmerID: ${farmerId}\nPassword: ${password}\n\nKeep these safe. You can log in on any device.`,
+    subject: "Your AgriMan FarmerID and password",
+    text,
+    html,
   };
   try {
     const res = await fetch("https://api.resend.com/emails", {
@@ -270,7 +299,7 @@ async function sendWelcomeEmail(env, { email, farmerId, password }) {
     });
     if (!res.ok) {
       const detail = await res.text();
-      return { sent: false, reason: detail.slice(0, 200) };
+      return { sent: false, reason: detail.slice(0, 300) };
     }
     return { sent: true };
   } catch (e) {
@@ -278,11 +307,15 @@ async function sendWelcomeEmail(env, { email, farmerId, password }) {
   }
 }
 
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 async function handleHealth(env) {
   if (!env.DB) return json({ ok: false, error: "DB_NOT_BOUND" }, 503);
   try {
     await ensureSchema(env.DB);
-    return json({ ok: true, provider: "cloudflare-d1", version: 2 });
+    return json({ ok: true, provider: "cloudflare-d1", version: 2, email_ready: Boolean(env.RESEND_API_KEY) });
   } catch (e) {
     return json({ ok: false, error: "DB_ERROR", detail: String(e) }, 503);
   }
@@ -291,9 +324,9 @@ async function handleHealth(env) {
 async function handleFarmerRegister(env, body) {
   const password = String(body?.password || "");
   const email = String(body?.email || "").trim().toLowerCase() || null;
-  const phone = String(body?.phone || "").trim() || null;
   if (password.length < 6) return err("WEAK_PASSWORD");
-  if (!email && !phone) return err("CONTACT_REQUIRED");
+  if (!email) return err("EMAIL_REQUIRED");
+  if (!isValidEmail(email)) return err("INVALID_EMAIL");
 
   await ensureSchema(env.DB);
 
@@ -307,9 +340,9 @@ async function handleFarmerRegister(env, body) {
     try {
       const insert = await env.DB.prepare(
         `INSERT INTO farmers (farmer_id, password_salt, password_hash, email, phone, created_at)
-         VALUES (?, ?, ?, ?, ?, ?)`
+         VALUES (?, ?, ?, ?, NULL, ?)`
       )
-        .bind(farmerId, b64(salt), passwordHash, email, phone, createdAt)
+        .bind(farmerId, b64(salt), passwordHash, email, createdAt)
         .run();
       if (!insert?.success) {
         lastDetail = JSON.stringify(insert);

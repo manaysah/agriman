@@ -90,13 +90,9 @@
         <form id="registerForm" class="form auth-form hidden">
           <label>
             <span data-i18n="email">Email</span>
-            <input type="email" name="email" autocomplete="email" placeholder="you@example.com" />
+            <input type="email" name="email" autocomplete="email" required placeholder="you@example.com" />
           </label>
-          <label>
-            <span data-i18n="phone">Phone</span>
-            <input type="tel" name="phone" autocomplete="tel" placeholder="+962…" />
-          </label>
-          <p class="hint" data-i18n="contactHint">Provide email or phone (or both).</p>
+          <p class="hint" data-i18n="emailHint">We’ll email your FarmerID and password to this address.</p>
           <label>
             <span data-i18n="password">Password</span>
             <input type="password" name="password" autocomplete="new-password" required minlength="6" />
@@ -105,9 +101,6 @@
             <span data-i18n="confirmPassword">Confirm password</span>
             <input type="password" name="confirm" autocomplete="new-password" required minlength="6" />
           </label>
-          <p class="hint" data-i18n="registerHint">
-            We’ll create your FarmerID (AgriBakMan-…) and email your credentials when possible.
-          </p>
           <button type="submit" class="primary-btn" data-i18n="register">Register</button>
         </form>
 

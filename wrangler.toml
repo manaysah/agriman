@@ -3,6 +3,9 @@ main = "./src/worker.js"
 compatibility_date = "2024-11-12"
 account_id = "33b8081b03d586f1045d8f49d71d5dff"
 
+[vars]
+EMAIL_FROM = "AgriMan <onboarding@resend.dev>"
+
 [assets]
 directory = "./"
 binding = "ASSETS"

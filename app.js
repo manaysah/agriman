@@ -114,15 +114,14 @@
       login: "Log in",
       register: "Register",
       email: "Email",
-      phone: "Phone",
-      contactHint: "Provide email or phone (or both).",
-      registerHint: "We’ll create your FarmerID (AgriBakMan-…) and email your credentials when possible.",
+      emailHint: "We’ll email your FarmerID and password to this address.",
+      registerHint: "We’ll create your FarmerID (AgriBakMan-…) and email your credentials.",
       farmerId: "FarmerID",
       yourFarmerId: "Your FarmerID",
       copyFarmerId: "Copy FarmerID",
       farmerRegistered: "Account created. Your FarmerID:",
       emailSent: "Credentials emailed.",
-      emailNotSent: "Email not sent — save your FarmerID and password.",
+      emailNotSent: "Email not sent — save your FarmerID and password. (Is Resend configured? See SETUP-CLOUD.md.)",
       myFarms: "My farms",
       farmsHubHint: "Select a farm to open its season ledger.",
       addFarm: "Add farm",
@@ -176,7 +175,8 @@
       farmCreated: "Account created. Your FarmerID:",
       settingsHint:
         "Cloud data is shared with anyone who has your FarmerID and password. Export a backup as extra safety.",
-      contactRequired: "Add email or phone to register.",
+      emailRequired: "Email is required to register.",
+      invalidEmail: "Enter a valid email address.",
       merchantRequired: "Merchant name is required.",
       cats: {
         land: "Land / rent",
@@ -220,9 +220,8 @@
       login: "تسجيل الدخول",
       register: "تسجيل",
       email: "البريد",
-      phone: "الهاتف",
-      contactHint: "أدخل البريد أو الهاتف (أو كليهما).",
-      registerHint: "سنُنشئ FarmerID (AgriBakMan-…) ونرسل بيانات الدخول بالبريد إن أمكن.",
+      emailHint: "سنرسل FarmerID وكلمة المرور إلى هذا البريد.",
+      registerHint: "سنُنشئ FarmerID (AgriBakMan-…) ونرسل بيانات الدخول بالبريد.",
       farmerId: "FarmerID",
       yourFarmerId: "FarmerID الخاص بك",
       copyFarmerId: "نسخ FarmerID",
@@ -257,7 +256,8 @@
       byCompany: "حسب الشركة",
       byVegetable: "حسب الخضار",
       shipments: "شحنات",
-      contactRequired: "أضف البريد أو الهاتف للتسجيل.",
+      emailRequired: "البريد مطلوب للتسجيل.",
+      invalidEmail: "أدخل بريداً إلكترونياً صالحاً.",
       merchantRequired: "اسم التاجر مطلوب.",
       marketTrips: "رحلات السوق",
       expense: "مصروف",
@@ -569,7 +569,8 @@
     if (msg.includes("WEAK_PASSWORD")) return "Password must be at least 6 characters.";
     if (msg.includes("BAD_SESSION")) return t("authErrorGeneric");
     if (msg.includes("INVALID_FARM_ID")) return "Invalid FarmerID.";
-    if (msg.includes("CONTACT_REQUIRED")) return t("contactRequired");
+    if (msg.includes("CONTACT_REQUIRED") || msg.includes("EMAIL_REQUIRED")) return t("emailRequired");
+    if (msg.includes("INVALID_EMAIL")) return t("invalidEmail");
     if (msg.includes("DB_NOT_BOUND")) return t("cloudSetupNeeded");
     return t("authErrorGeneric");
   }
@@ -1681,11 +1682,10 @@
     const confirm = String(fd.get("confirm") || "");
     if (password !== confirm) return showAuthError(t("passwordMismatch"));
     const email = String(fd.get("email") || "").trim();
-    const phone = String(fd.get("phone") || "").trim();
-    if (!email && !phone) return showAuthError(t("contactRequired"));
+    if (!email) return showAuthError(t("emailRequired"));
     setAuthBusy(true);
     try {
-      const data = await apiFarmer("register", { password, email, phone });
+      const data = await apiFarmer("register", { password, email });
       setLocalOnly(false);
       saveSession({ farmerId: data.farmer_id, token: data.token });
       const emailNote = data.email_sent ? t("emailSent") : t("emailNotSent");
