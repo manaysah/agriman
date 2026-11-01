@@ -6,8 +6,9 @@ account_id = "33b8081b03d586f1045d8f49d71d5dff"
 [vars]
 EMAIL_FROM = "AgriMan <noreply@mail.agribak.com>"
 EMAIL_FROM_FALLBACK = "AgriMan <onboarding@resend.dev>"
-# If farmer welcome mail fails (domain not verified), send a copy here via onboarding@resend.dev.
-EMAIL_FAIL_NOTIFY_TO = "mhmd.manaysah@gmail.com"
+# Brevo delivers to any inbox when Resend domain is not verified (verify this sender once in Brevo).
+BREVO_SENDER = "AgriMan <mhmd.manaysah@gmail.com>"
+# Secret: npx wrangler secret put BREVO_API_KEY
 # Set via secret: npx wrangler secret put ADMIN_PASSWORD  (min 8 characters)
 ADMIN_USERNAME = "admin"
 

@@ -574,7 +574,6 @@
 
   function registerEmailNote(data) {
     if (data?.email_sent) return t("emailSent");
-    if (data?.email_copy_sent) return t("emailCopyToAdmin");
     const status = String(data?.email_status || "");
     if (status.includes("only send testing emails")) return t("emailResendTestingOnly");
     if (

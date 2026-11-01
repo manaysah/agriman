@@ -342,17 +342,121 @@ async function resendSend(apiKey, { from, to, subject, text, html }) {
   }
 }
 
-async function sendWelcomeEmail(env, { email, farmerId, password }) {
+function parseFromAddress(from) {
+  const raw = String(from || "").trim();
+  const m = raw.match(/^(.+?)\s*<([^>]+)>$/);
+  if (m) return { name: m[1].trim(), email: m[2].trim().toLowerCase() };
+  if (raw.includes("@")) return { name: "AgriMan", email: raw.toLowerCase() };
+  return { name: "AgriMan", email: "" };
+}
+
+async function brevoSend(apiKey, { senderName, senderEmail, to, subject, text, html }) {
+  try {
+    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "api-key": apiKey,
+        "content-type": "application/json",
+        accept: "application/json",
+      },
+      body: JSON.stringify({
+        sender: { name: senderName, email: senderEmail },
+        to: [{ email: to }],
+        subject,
+        htmlContent: html,
+        textContent: text,
+      }),
+    });
+    if (!res.ok) {
+      const detail = await res.text();
+      return { sent: false, reason: resendFailureReason(detail), raw: detail.slice(0, 300) };
+    }
+    return { sent: true };
+  } catch (e) {
+    return { sent: false, reason: String(e?.message || e) };
+  }
+}
+
+async function sendViaResend(env, { deliverTo, subject, text, html }) {
   const apiKey = env.RESEND_API_KEY;
   if (!apiKey) return { sent: false, reason: "RESEND_NOT_CONFIGURED" };
+
+  const primary = String(env.EMAIL_FROM || DEFAULT_EMAIL_FROM).trim() || DEFAULT_EMAIL_FROM;
+  const fallback = String(env.EMAIL_FROM_FALLBACK || DEFAULT_EMAIL_FROM).trim() || DEFAULT_EMAIL_FROM;
+  const fromCandidates = [primary];
+  if (primary !== fallback) fromCandidates.push(fallback);
+
+  let lastReason = "";
+  for (let i = 0; i < fromCandidates.length; i++) {
+    const from = fromCandidates[i];
+    const result = await resendSend(apiKey, { from, to: deliverTo, subject, text, html });
+    if (result.sent) {
+      return {
+        sent: true,
+        provider: "resend",
+        from_used: from,
+        delivered_to: deliverTo,
+      };
+    }
+    lastReason = result.reason || result.raw || "SEND_FAILED";
+    if (
+      i === 0 &&
+      fromCandidates.length === 1 &&
+      primary !== fallback &&
+      shouldTryFallbackFrom(lastReason, primary, fallback)
+    ) {
+      fromCandidates.push(fallback);
+    }
+  }
+  return { sent: false, reason: lastReason };
+}
+
+async function sendViaBrevo(env, { deliverTo, subject, text, html }) {
+  const apiKey = env.BREVO_API_KEY;
+  if (!apiKey) return { sent: false, reason: "BREVO_NOT_CONFIGURED" };
+
+  const fromRaw = String(env.BREVO_SENDER || env.BREVO_SENDER_EMAIL || "").trim();
+  const parsed = fromRaw.includes("<")
+    ? parseFromAddress(fromRaw)
+    : {
+        name: String(env.BREVO_SENDER_NAME || "AgriMan").trim() || "AgriMan",
+        email: fromRaw.toLowerCase(),
+      };
+  if (!parsed.email || !isValidEmail(parsed.email)) {
+    return { sent: false, reason: "BREVO_SENDER_INVALID" };
+  }
+
+  const result = await brevoSend(apiKey, {
+    senderName: parsed.name,
+    senderEmail: parsed.email,
+    to: deliverTo,
+    subject,
+    text,
+    html,
+  });
+  if (result.sent) {
+    return {
+      sent: true,
+      provider: "brevo",
+      from_used: `${parsed.name} <${parsed.email}>`,
+      delivered_to: deliverTo,
+    };
+  }
+  return result;
+}
+
+async function sendWelcomeEmail(env, { email, farmerId, password }) {
   if (!email) return { sent: false, reason: "NO_EMAIL" };
+  if (!env.RESEND_API_KEY && !env.BREVO_API_KEY) {
+    return { sent: false, reason: "EMAIL_NOT_CONFIGURED" };
+  }
 
   const testTo = String(env.EMAIL_TEST_TO || "").trim().toLowerCase();
   const routeToTestInbox = testTo && isValidEmail(testTo);
   const deliverTo = routeToTestInbox ? testTo : email;
   const overrideNote =
     deliverTo !== email
-      ? `\n\n(Registered email on file: ${email}. Welcome mail routed to EMAIL_TEST_TO for Resend testing.)`
+      ? `\n\n(Registered email on file: ${email}. Welcome mail routed to EMAIL_TEST_TO for testing.)`
       : "";
 
   const text = [
@@ -380,75 +484,29 @@ ${htmlExtra}
 </body></html>`;
   const subject = "Your AgriMan FarmerID and password";
 
-  const primary = String(env.EMAIL_FROM || DEFAULT_EMAIL_FROM).trim() || DEFAULT_EMAIL_FROM;
-  const fallback = String(env.EMAIL_FROM_FALLBACK || DEFAULT_EMAIL_FROM).trim() || DEFAULT_EMAIL_FROM;
+  let lastReason = "SEND_FAILED";
 
-  const fromCandidates = [primary];
-  if (primary !== fallback) fromCandidates.push(fallback);
+  if (env.RESEND_API_KEY) {
+    const resendResult = await sendViaResend(env, { deliverTo, subject, text, html });
+    if (resendResult.sent) {
+      return { ...resendResult, test_override: deliverTo !== email };
+    }
+    lastReason = resendResult.reason || lastReason;
+  }
 
-  let lastReason = "";
-  for (let i = 0; i < fromCandidates.length; i++) {
-    const from = fromCandidates[i];
-    const result = await resendSend(apiKey, { from, to: deliverTo, subject, text, html });
-    if (result.sent) {
-      return {
-        sent: true,
-        from_used: from,
-        delivered_to: deliverTo,
-        test_override: deliverTo !== email,
-      };
+  if (env.BREVO_API_KEY) {
+    const brevoResult = await sendViaBrevo(env, { deliverTo, subject, text, html });
+    if (brevoResult.sent) {
+      return { ...brevoResult, test_override: deliverTo !== email };
     }
-    lastReason = result.reason || result.raw || "SEND_FAILED";
-    if (
-      i === 0 &&
-      fromCandidates.length === 1 &&
-      primary !== fallback &&
-      shouldTryFallbackFrom(lastReason, primary, fallback)
-    ) {
-      fromCandidates.push(fallback);
-    }
+    lastReason = brevoResult.reason || lastReason;
   }
 
   if (
-    !isResendDevFrom(primary) &&
-    (lastReason.toLowerCase().includes("not verified") ||
-      lastReason.toLowerCase().includes("verify a domain"))
+    String(lastReason).toLowerCase().includes("not verified") ||
+    String(lastReason).toLowerCase().includes("verify a domain")
   ) {
-    lastReason = `RESEND_DOMAIN_NOT_VERIFIED: Add and verify the domain in your Resend From address (currently ${primary}). ${lastReason}`;
-  }
-
-  // Could not deliver to farmer: optional admin copy (Resend onboarding → account inbox only)
-  const failNotify =
-    String(env.EMAIL_FAIL_NOTIFY_TO || env.EMAIL_TEST_TO || "")
-      .trim()
-      .toLowerCase();
-  if (failNotify && isValidEmail(failNotify) && failNotify !== email && !routeToTestInbox) {
-    const adminText =
-      text +
-      `\n\n(Could not deliver welcome mail to ${email}. Reason: ${lastReason})`;
-    const adminHtml = html.replace(
-      "</body>",
-      `<p style="color:#9b3d2a;">Could not deliver to ${escapeHtml(email)}: ${escapeHtml(lastReason)}</p></body>`
-    );
-    for (const from of [fallback]) {
-      const result = await resendSend(apiKey, {
-        from,
-        to: failNotify,
-        subject: `[AgriMan copy] ${subject}`,
-        text: adminText,
-        html: adminHtml,
-      });
-      if (result.sent) {
-        return {
-          sent: false,
-          reason: lastReason,
-          admin_copy_sent: true,
-          admin_copy_to: failNotify,
-          from_used: from,
-        };
-      }
-      lastReason = result.reason || lastReason;
-    }
+    lastReason = `RESEND_DOMAIN_NOT_VERIFIED: Verify mail.agribak.com in Resend, or set BREVO_API_KEY for delivery to any inbox. ${lastReason}`;
   }
 
   return { sent: false, reason: lastReason };
@@ -463,8 +521,9 @@ async function handleHealth(env) {
       ok: true,
       provider: "cloudflare-d1",
       version: 2,
-      email_ready: Boolean(env.RESEND_API_KEY),
+      email_ready: Boolean(env.RESEND_API_KEY || env.BREVO_API_KEY),
       email_from: from.includes("@") ? from : DEFAULT_EMAIL_FROM,
+      email_brevo: Boolean(env.BREVO_API_KEY),
       email_test_to: Boolean(String(env.EMAIL_TEST_TO || "").trim()),
       admin_ready: adminConfigured(env),
     });
@@ -505,11 +564,8 @@ async function handleFarmerRegister(env, body) {
       farmer_id: farmerId,
       token,
       email_sent: emailResult.sent === true,
-      email_copy_sent: emailResult.admin_copy_sent === true,
-      email_copy_to: emailResult.admin_copy_to || null,
-      email_status: emailResult.sent
-        ? "sent"
-        : emailResult.reason || (emailResult.admin_copy_sent ? "farmer_delivery_failed" : "skipped"),
+      email_status: emailResult.sent ? "sent" : emailResult.reason || "skipped",
+      email_provider: emailResult.provider || null,
     });
   } catch (e) {
     return json({ error: "REGISTER_FAILED", detail: String(e?.message || e) }, 500);

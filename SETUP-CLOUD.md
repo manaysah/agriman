@@ -22,6 +22,17 @@ Registration is **email only**. The Worker sends **FarmerID** + **password** via
 
 Or: `npx wrangler secret put RESEND_API_KEY`
 
+### 1b. Brevo fallback (send to any farmer email)
+
+Resend needs a **verified domain** (`agribak.com` is not registered yet). To deliver welcome mail to **whatever address farmers enter**, add [Brevo](https://www.brevo.com) (free tier):
+
+1. Brevo → **Settings → Senders** → add **`mhmd.manaysah@gmail.com`** (or your `BREVO_SENDER` in `wrangler.toml`) → verify the 6-digit code in that inbox.
+2. Brevo → **SMTP & API → API keys** → create key.
+3. Cloudflare → agriman → **Secrets** → `BREVO_API_KEY` = your Brevo key  
+   Or: `npx wrangler secret put BREVO_API_KEY`
+
+The Worker tries **Resend first**, then **Brevo** to the farmer’s email. Health: `"email_brevo": true` when the secret is set.
+
 ### 2. Sender address (`EMAIL_FROM`)
 
 Configured in [wrangler.toml](wrangler.toml) and deployed with the Worker.
