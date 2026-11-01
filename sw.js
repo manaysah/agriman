@@ -1,4 +1,4 @@
-const CACHE = "agriman-v6";
+const CACHE = "agriman-v7";
 const ASSETS = ["./logo.jpg", "./manifest.json", "./icon.svg"];
 
 self.addEventListener("install", (event) => {

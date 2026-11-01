@@ -125,7 +125,9 @@
       emailResendTestingOnly:
         "Email not sent: Resend can only deliver to your Resend login email until agribak.com is verified. Use that email to register, or verify your domain in Resend.",
       emailNeedDomain:
-        "Email not sent: verify agribak.com at resend.com/domains, set EMAIL_FROM to hello@agribak.com, and redeploy.",
+        "Email not sent to the address you entered: Resend needs a verified domain (e.g. mail.agribak.com). Register agribak.com, add DNS records in Resend, then redeploy. Until then, only your Resend login email can receive welcome mail directly.",
+      emailCopyToAdmin:
+        "Could not email the address you entered. A copy with FarmerID and password was sent to the site admin inbox.",
       myFarms: "My farms",
       farmsHubHint: "Select a farm to open its season ledger.",
       addFarm: "Add farm",
@@ -233,6 +235,8 @@
       farmerRegistered: "تم إنشاء الحساب. FarmerID:",
       emailSent: "تم إرسال البيانات بالبريد.",
       emailNotSent: "لم يُرسل البريد — احفظ FarmerID وكلمة المرور.",
+      emailCopyToAdmin:
+        "تعذّر الإرسال إلى البريد المدخل. أُرسلت نسخة تحتوي FarmerID وكلمة المرور إلى بريد مسؤول الموقع.",
       myFarms: "مزارعي",
       farmsHubHint: "اختر مزرعة لفتح دفتر الموسم.",
       addFarm: "إضافة مزرعة",
@@ -570,9 +574,14 @@
 
   function registerEmailNote(data) {
     if (data?.email_sent) return t("emailSent");
+    if (data?.email_copy_sent) return t("emailCopyToAdmin");
     const status = String(data?.email_status || "");
     if (status.includes("only send testing emails")) return t("emailResendTestingOnly");
-    if (status.includes("RESEND_DOMAIN_NOT_VERIFIED") || status.includes("verify a domain") || status.includes("not verified"))
+    if (
+      status.includes("RESEND_DOMAIN_NOT_VERIFIED") ||
+      status.includes("verify a domain") ||
+      status.includes("not verified")
+    )
       return t("emailNeedDomain");
     if (status.includes("RESEND_NOT_CONFIGURED")) return t("emailNotSent");
     return t("emailNotSent");

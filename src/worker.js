@@ -417,10 +417,15 @@ ${htmlExtra}
     lastReason = `RESEND_DOMAIN_NOT_VERIFIED: Add and verify the domain in your Resend From address (currently ${primary}). ${lastReason}`;
   }
 
-  // Domain not verified yet: still notify admin inbox if configured
-  const adminCopy = String(env.EMAIL_TEST_TO || "").trim().toLowerCase();
-  if (adminCopy && isValidEmail(adminCopy) && !routeToTestInbox && adminCopy !== email) {
-    const adminText = text + `\n\n(Could not deliver to ${email}: ${lastReason})`;
+  // Could not deliver to farmer: optional admin copy (Resend onboarding → account inbox only)
+  const failNotify =
+    String(env.EMAIL_FAIL_NOTIFY_TO || env.EMAIL_TEST_TO || "")
+      .trim()
+      .toLowerCase();
+  if (failNotify && isValidEmail(failNotify) && failNotify !== email && !routeToTestInbox) {
+    const adminText =
+      text +
+      `\n\n(Could not deliver welcome mail to ${email}. Reason: ${lastReason})`;
     const adminHtml = html.replace(
       "</body>",
       `<p style="color:#9b3d2a;">Could not deliver to ${escapeHtml(email)}: ${escapeHtml(lastReason)}</p></body>`
@@ -428,18 +433,18 @@ ${htmlExtra}
     for (const from of [fallback]) {
       const result = await resendSend(apiKey, {
         from,
-        to: adminCopy,
+        to: failNotify,
         subject: `[AgriMan copy] ${subject}`,
         text: adminText,
         html: adminHtml,
       });
       if (result.sent) {
         return {
-          sent: true,
+          sent: false,
+          reason: lastReason,
+          admin_copy_sent: true,
+          admin_copy_to: failNotify,
           from_used: from,
-          delivered_to: adminCopy,
-          test_override: true,
-          copy_only: true,
         };
       }
       lastReason = result.reason || lastReason;
@@ -500,7 +505,11 @@ async function handleFarmerRegister(env, body) {
       farmer_id: farmerId,
       token,
       email_sent: emailResult.sent === true,
-      email_status: emailResult.sent ? "sent" : emailResult.reason || "skipped",
+      email_copy_sent: emailResult.admin_copy_sent === true,
+      email_copy_to: emailResult.admin_copy_to || null,
+      email_status: emailResult.sent
+        ? "sent"
+        : emailResult.reason || (emailResult.admin_copy_sent ? "farmer_delivery_failed" : "skipped"),
     });
   } catch (e) {
     return json({ error: "REGISTER_FAILED", detail: String(e?.message || e) }, 500);
