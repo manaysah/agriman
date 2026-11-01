@@ -330,7 +330,8 @@ async function sendWelcomeEmail(env, { email, farmerId, password }) {
   if (!email) return { sent: false, reason: "NO_EMAIL" };
 
   const testTo = String(env.EMAIL_TEST_TO || "").trim().toLowerCase();
-  const deliverTo = testTo && isValidEmail(testTo) ? testTo : email;
+  const routeToTestInbox = testTo && isValidEmail(testTo);
+  const deliverTo = routeToTestInbox ? testTo : email;
   const overrideNote =
     deliverTo !== email
       ? `\n\n(Registered email on file: ${email}. Welcome mail routed to EMAIL_TEST_TO for Resend testing.)`
@@ -368,7 +369,9 @@ ${htmlExtra}
     .toLowerCase() === "1";
 
   const fromCandidates = [primary];
-  if (allowOnboardingFallback && primary !== fallback) fromCandidates.push(fallback);
+  if (primary !== fallback && (allowOnboardingFallback || routeToTestInbox)) {
+    fromCandidates.push(fallback);
+  }
 
   let lastReason = "";
   for (const from of fromCandidates) {
@@ -387,7 +390,7 @@ ${htmlExtra}
 
   // Domain not verified yet: still notify admin inbox if configured
   const adminCopy = String(env.EMAIL_TEST_TO || "").trim().toLowerCase();
-  if (adminCopy && isValidEmail(adminCopy) && deliverTo === email && adminCopy !== email) {
+  if (adminCopy && isValidEmail(adminCopy) && !routeToTestInbox && adminCopy !== email) {
     const adminText = text + `\n\n(Could not deliver to ${email}: ${lastReason})`;
     const adminHtml = html.replace(
       "</body>",
