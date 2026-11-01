@@ -6,8 +6,6 @@ account_id = "33b8081b03d586f1045d8f49d71d5dff"
 [vars]
 EMAIL_FROM = "AgriMan <noreply@mail.agribak.com>"
 EMAIL_FROM_FALLBACK = "AgriMan <onboarding@resend.dev>"
-# Until Resend shows mail.agribak.com Verified: copies welcome mail to your inbox when farmer mail fails.
-EMAIL_TEST_TO = "mhmd.manaysah@gmail.com"
 # Set via secret: npx wrangler secret put ADMIN_PASSWORD  (min 8 characters)
 ADMIN_USERNAME = "admin"
 
