@@ -34,22 +34,30 @@ https://agriman.agribakr.workers.dev/api/farm/health → `"email_ready": true`, 
 
 The Worker tries **`EMAIL_FROM`**, then falls back to **`onboarding@resend.dev`** if the primary domain is not verified yet.
 
-### 3. Testing vs production recipients
+### 3. Production sender (live farmers)
 
-**Testing (current):** [wrangler.toml](wrangler.toml) sets `EMAIL_TEST_TO` to your Resend login Gmail. Welcome mail is **delivered there** even if the farmer registers with another address; the registered email is stored in D1 and noted in the message body.
+1. [resend.com/domains](https://resend.com/domains) → **Add** → `mail.agribak.com`
+2. At your DNS host (often Cloudflare), add **every** record Resend lists (SPF, DKIM, etc.)
+3. Wait until Resend shows **Verified**
+4. Deploy this repo — `wrangler.toml` uses:
+   ```toml
+   EMAIL_FROM = "AgriMan <noreply@mail.agribak.com>"
+   ```
+5. Do **not** set `EMAIL_TEST_TO` in Cloudflare Variables unless you want all mail routed to one inbox for debugging.
 
-Remove `EMAIL_TEST_TO` (or clear it in Cloudflare Variables) before go-live.
+If the domain is not verified yet, the Worker falls back to `onboarding@resend.dev` (Resend account email only).
 
-**Production:** In [resend.com/domains](https://resend.com/domains), add e.g. **`mail.agribak.com`**, add DNS records at your provider, wait for **Verified**, then:
+### 4. Temporary testing (optional)
+
+Uncomment in `wrangler.toml`:
 
 ```toml
-# Remove or comment out EMAIL_TEST_TO
-EMAIL_FROM = "AgriMan <noreply@mail.agribak.com>"
+EMAIL_TEST_TO = "your-resend-login@gmail.com"
 ```
 
-Redeploy. Farmers receive mail at the address they register with.
+Welcome mail goes there regardless of register email. Remove before go-live.
 
-### 4. Verify `agribak.com` (send to any farmer email)
+### 5. Verify delivery
 
 1. [resend.com/domains](https://resend.com/domains) → **Add** → `agribak.com`
 2. Add the DNS records Resend shows (SPF, DKIM, etc.) where `agribak.com` DNS is hosted (often Cloudflare DNS).
