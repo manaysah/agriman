@@ -4,11 +4,12 @@ compatibility_date = "2024-11-12"
 account_id = "33b8081b03d586f1045d8f49d71d5dff"
 
 [vars]
-# Production sender (requires mail.agribak.com Verified in Resend → Domains + DNS).
 EMAIL_FROM = "AgriMan <noreply@mail.agribak.com>"
 EMAIL_FROM_FALLBACK = "AgriMan <onboarding@resend.dev>"
-# Optional: set to your Gmail while testing before domain is verified (remove when live):
-# EMAIL_TEST_TO = "mhmd.manaysah@gmail.com"
+# Until Resend shows mail.agribak.com Verified: copies welcome mail to your inbox when farmer mail fails.
+EMAIL_TEST_TO = "mhmd.manaysah@gmail.com"
+# Set to "1" only for legacy testing with onboarding@ as primary (not needed for production).
+# EMAIL_ALLOW_ONBOARDING_FALLBACK = "0"
 
 [assets]
 directory = "./"

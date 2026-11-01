@@ -288,7 +288,13 @@ function resendFailureReason(httpBody) {
   }
 }
 
-function shouldTryFallbackFrom(reason) {
+function isResendDevFrom(from) {
+  return String(from || "").includes("@resend.dev");
+}
+
+function shouldTryFallbackFrom(reason, primaryFrom, allowFallback) {
+  if (!allowFallback) return false;
+  if (!isResendDevFrom(primaryFrom)) return false;
   const r = reason.toLowerCase();
   return (
     r.includes("domain is not verified") ||
@@ -357,7 +363,12 @@ ${htmlExtra}
 
   const primary = String(env.EMAIL_FROM || DEFAULT_EMAIL_FROM).trim() || DEFAULT_EMAIL_FROM;
   const fallback = String(env.EMAIL_FROM_FALLBACK || DEFAULT_EMAIL_FROM).trim() || DEFAULT_EMAIL_FROM;
-  const fromCandidates = primary === fallback ? [primary] : [primary, fallback];
+  const allowOnboardingFallback = String(env.EMAIL_ALLOW_ONBOARDING_FALLBACK || "")
+    .trim()
+    .toLowerCase() === "1";
+
+  const fromCandidates = [primary];
+  if (allowOnboardingFallback && primary !== fallback) fromCandidates.push(fallback);
 
   let lastReason = "";
   for (const from of fromCandidates) {
@@ -371,8 +382,38 @@ ${htmlExtra}
       };
     }
     lastReason = result.reason || result.raw || "SEND_FAILED";
-    if (from === fallback || !shouldTryFallbackFrom(lastReason)) break;
+    if (from === fallback || !shouldTryFallbackFrom(lastReason, primary, allowOnboardingFallback)) break;
   }
+
+  // Domain not verified yet: still notify admin inbox if configured
+  const adminCopy = String(env.EMAIL_TEST_TO || "").trim().toLowerCase();
+  if (adminCopy && isValidEmail(adminCopy) && deliverTo === email && adminCopy !== email) {
+    const adminText = text + `\n\n(Could not deliver to ${email}: ${lastReason})`;
+    const adminHtml = html.replace(
+      "</body>",
+      `<p style="color:#9b3d2a;">Could not deliver to ${escapeHtml(email)}: ${escapeHtml(lastReason)}</p></body>`
+    );
+    for (const from of [fallback]) {
+      const result = await resendSend(apiKey, {
+        from,
+        to: adminCopy,
+        subject: `[AgriMan copy] ${subject}`,
+        text: adminText,
+        html: adminHtml,
+      });
+      if (result.sent) {
+        return {
+          sent: true,
+          from_used: from,
+          delivered_to: adminCopy,
+          test_override: true,
+          copy_only: true,
+        };
+      }
+      lastReason = result.reason || lastReason;
+    }
+  }
+
   return { sent: false, reason: lastReason };
 }
 
