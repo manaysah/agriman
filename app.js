@@ -121,7 +121,11 @@
       copyFarmerId: "Copy FarmerID",
       farmerRegistered: "Account created. Your FarmerID:",
       emailSent: "Credentials emailed.",
-      emailNotSent: "Email not sent — save your FarmerID and password. (Is Resend configured? See SETUP-CLOUD.md.)",
+      emailNotSent: "Email not sent — save your FarmerID and password.",
+      emailResendTestingOnly:
+        "Email not sent: Resend can only deliver to your Resend login email until agribak.com is verified. Use that email to register, or verify your domain in Resend.",
+      emailNeedDomain:
+        "Email not sent: verify agribak.com at resend.com/domains, set EMAIL_FROM to hello@agribak.com, and redeploy.",
       myFarms: "My farms",
       farmsHubHint: "Select a farm to open its season ledger.",
       addFarm: "Add farm",
@@ -564,7 +568,14 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
 
-  function mapAuthError(err) {
+  function registerEmailNote(data) {
+    if (data?.email_sent) return t("emailSent");
+    const status = String(data?.email_status || "");
+    if (status.includes("only send testing emails")) return t("emailResendTestingOnly");
+    if (status.includes("verify a domain") || status.includes("not verified")) return t("emailNeedDomain");
+    if (status.includes("RESEND_NOT_CONFIGURED")) return t("emailNotSent");
+    return t("emailNotSent");
+  }
     const msg = String(err?.code || err?.message || err || "");
     if (msg.includes("BAD_LOGIN")) return t("authErrorGeneric");
     if (msg.includes("FARM_EXISTS")) return "Farm ID already exists. Try again.";
@@ -1691,7 +1702,7 @@
       const data = await apiFarmer("register", { password, email });
       setLocalOnly(false);
       saveSession({ farmerId: data.farmer_id, token: data.token });
-      const emailNote = data.email_sent ? t("emailSent") : t("emailNotSent");
+      const emailNote = registerEmailNote(data);
       alert(`${t("farmerRegistered")}\n${data.farmer_id}\n\n${emailNote}`);
       await enterAppFromSession();
     } catch (err) {
