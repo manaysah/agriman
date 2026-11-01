@@ -385,7 +385,6 @@ ${htmlExtra}
       };
     }
     lastReason = result.reason || result.raw || "SEND_FAILED";
-    if (from === fallback || !shouldTryFallbackFrom(lastReason, primary, allowOnboardingFallback)) break;
   }
 
   // Domain not verified yet: still notify admin inbox if configured
