@@ -2,79 +2,62 @@
 
 Live app: https://agriman.agribakr.workers.dev/
 
-## Cloudflare Git deploy settings (fix the build error)
-
-Your project is a **Worker**. In **Workers & Pages → agriman → Settings → Build**:
+## Cloudflare Git deploy settings
 
 | Setting | Value |
 |--------|--------|
 | Build command | *(leave empty)* |
 | **Deploy command** | `npx wrangler deploy ./src/worker.js --assets=.` |
 
-Do **not** use `wrangler pages deploy`.
+## Email on register (Resend)
 
-We removed the `functions/` folder (that made Cloudflare think this was Pages and then fail with “Missing entry-point”).
+Registration is **email only**. The Worker sends **FarmerID** + **password** via [Resend](https://resend.com).
 
-## Email on register (required for signup — Resend)
+### 1. API key (Cloudflare secret)
 
-Registration is **email only**. After signup, the Worker sends **FarmerID** + **password** via [Resend](https://resend.com).
+**Workers & Pages → agriman → Settings → Variables and Secrets** → add encrypted secret:
 
-### 1. Resend account
+- Name: `RESEND_API_KEY`
+- Value: your `re_…` key from Resend
 
-1. Sign up at [resend.com](https://resend.com).
-2. Create an **API key** (Sending access).
+Or: `npx wrangler secret put RESEND_API_KEY`
 
-### 2. Cloudflare Worker secret (required)
+### 2. Sender address (`EMAIL_FROM`)
 
-From your machine (logged into Wrangler for account `33b8081b…`):
+Configured in [wrangler.toml](wrangler.toml) and deployed with the Worker.
 
-```bash
-cd /path/to/farm-money-tracker
-npx wrangler secret put RESEND_API_KEY
-# paste the re_... key when prompted
-```
+**Important:** In **Cloudflare → agriman → Settings → Variables**, remove any old **`EMAIL_FROM`** that points at an **unverified** domain (e.g. `@agribak.com` before DNS is done). Otherwise sends fail with “domain is not verified.”
 
-Redeploy (push to `main` or `npx wrangler deploy ./src/worker.js --assets=.`).
+After deploy, health shows the active sender:
 
-### 3. Check it is wired
+https://agriman.agribakr.workers.dev/api/farm/health → `"email_ready": true`, `"email_from": "..."`
 
-Open https://agriman.agribakr.workers.dev/api/farm/health
+The Worker tries **`EMAIL_FROM`**, then falls back to **`onboarding@resend.dev`** if the primary domain is not verified yet.
 
-You should see `"email_ready": true`. If `false`, `RESEND_API_KEY` is not set on the Worker.
+### 3. Verify `agribak.com` (send to any farmer email)
 
-### 4. Sender address
+1. [resend.com/domains](https://resend.com/domains) → **Add** → `agribak.com`
+2. Add the DNS records Resend shows (SPF, DKIM, etc.) where `agribak.com` DNS is hosted (often Cloudflare DNS).
+3. Wait until Resend status is **Verified**.
+4. In `wrangler.toml`, set:
+   ```toml
+   EMAIL_FROM = "AgriMan <hello@agribak.com>"
+   ```
+5. Push / deploy.
 
-Default sender is in [wrangler.toml](wrangler.toml):
+Until then, with `onboarding@resend.dev`, Resend only delivers to **your Resend account email** (and test addresses like `delivered@resend.dev`). Do **not** use `@example.com` — Resend blocks it.
 
-`EMAIL_FROM = "AgriMan <onboarding@resend.dev>"`
+### 4. Test
 
-**Resend free tier:** without a verified domain, you can usually only send **to the email address on your Resend account** (for testing). To mail any farmer address, add and verify your domain in Resend, then set e.g.:
-
-```toml
-EMAIL_FROM = "AgriMan <hello@yourdomain.com>"
-```
-
-### 5. What the user receives
-
-Subject: **Your AgriMan FarmerID and password**
-
-Body includes FarmerID (`AgriBakMan-…`), password, and link to the app.
-
-If sending fails, registration still completes and the app shows FarmerID on screen (`email_not_sent`).
+- Health: `"email_ready": true`
+- Register with your **real inbox** (same as Resend login until domain is verified)
+- Check spam; Resend **Logs** show accept/reject reasons
 
 ## API overview
 
 | Route | Purpose |
 |-------|---------|
-| `GET /api/farm/health` | D1 health + `email_ready` |
-| `POST /api/farmer/register` | email + password → `AgriBakMan-*` + welcome email |
+| `GET /api/farm/health` | D1 + `email_ready` + `email_from` |
+| `POST /api/farmer/register` | email + password → welcome email |
 | `POST /api/farmer/login` | FarmerID + password |
-| `POST /api/farms/list` | farms for session |
-| `POST /api/farms/create` | new crop farm |
-| `POST /api/farms/load` / `save` | per-farm ledger JSON |
-
-## After deploy
-
-1. Open https://agriman.agribakr.workers.dev/
-2. Health check shows `email_ready: true` after secret is set
-3. **Register** with a real email you can read (or your Resend account email on free tier)
+| `POST /api/farms/*` | multi-farm ledger |

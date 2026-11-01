@@ -177,6 +177,7 @@
         "Cloud data is shared with anyone who has your FarmerID and password. Export a backup as extra safety.",
       emailRequired: "Email is required to register.",
       invalidEmail: "Enter a valid email address.",
+      emailDomainBlocked: "That email domain cannot receive mail (e.g. example.com). Use your real inbox.",
       merchantRequired: "Merchant name is required.",
       cats: {
         land: "Land / rent",
@@ -258,6 +259,7 @@
       shipments: "شحنات",
       emailRequired: "البريد مطلوب للتسجيل.",
       invalidEmail: "أدخل بريداً إلكترونياً صالحاً.",
+      emailDomainBlocked: "نطاق البريد غير مدعوم (مثل example.com). استخدم بريدك الحقيقي.",
       merchantRequired: "اسم التاجر مطلوب.",
       marketTrips: "رحلات السوق",
       expense: "مصروف",
@@ -570,6 +572,7 @@
     if (msg.includes("BAD_SESSION")) return t("authErrorGeneric");
     if (msg.includes("INVALID_FARM_ID")) return "Invalid FarmerID.";
     if (msg.includes("CONTACT_REQUIRED") || msg.includes("EMAIL_REQUIRED")) return t("emailRequired");
+    if (msg.includes("EMAIL_DOMAIN_BLOCKED")) return t("emailDomainBlocked");
     if (msg.includes("INVALID_EMAIL")) return t("invalidEmail");
     if (msg.includes("DB_NOT_BOUND")) return t("cloudSetupNeeded");
     return t("authErrorGeneric");

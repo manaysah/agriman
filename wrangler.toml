@@ -4,7 +4,10 @@ compatibility_date = "2024-11-12"
 account_id = "33b8081b03d586f1045d8f49d71d5dff"
 
 [vars]
+# Resend: use onboarding@ until agribak.com shows Verified at resend.com/domains, then switch:
+# EMAIL_FROM = "AgriMan <hello@agribak.com>"
 EMAIL_FROM = "AgriMan <onboarding@resend.dev>"
+EMAIL_FROM_FALLBACK = "AgriMan <onboarding@resend.dev>"
 
 [assets]
 directory = "./"

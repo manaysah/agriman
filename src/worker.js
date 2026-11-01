@@ -259,11 +259,70 @@ function escapeHtml(str) {
     .replaceAll('"', "&quot;");
 }
 
+const DEFAULT_EMAIL_FROM = "AgriMan <onboarding@resend.dev>";
+const BLOCKED_EMAIL_DOMAINS = new Set([
+  "example.com",
+  "example.org",
+  "example.net",
+  "test.com",
+  "localhost",
+  "invalid",
+]);
+
+function emailDomain(email) {
+  return String(email || "").split("@")[1]?.toLowerCase() || "";
+}
+
+function isValidEmail(email) {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return false;
+  if (BLOCKED_EMAIL_DOMAINS.has(emailDomain(email))) return false;
+  return true;
+}
+
+function resendFailureReason(httpBody) {
+  try {
+    const parsed = JSON.parse(httpBody);
+    return String(parsed.message || httpBody);
+  } catch {
+    return String(httpBody || "");
+  }
+}
+
+function shouldTryFallbackFrom(reason) {
+  const r = reason.toLowerCase();
+  return (
+    r.includes("domain is not verified") ||
+    r.includes("not verified") ||
+    r.includes("only send testing emails") ||
+    r.includes("403")
+  );
+}
+
+async function resendSend(apiKey, { from, to, subject, text, html }) {
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ from, to: [to], subject, text, html }),
+    });
+    if (!res.ok) {
+      const detail = await res.text();
+      return { sent: false, reason: resendFailureReason(detail), raw: detail.slice(0, 300) };
+    }
+    return { sent: true };
+  } catch (e) {
+    return { sent: false, reason: String(e?.message || e) };
+  }
+}
+
 async function sendWelcomeEmail(env, { email, farmerId, password }) {
   const apiKey = env.RESEND_API_KEY;
   if (!apiKey) return { sent: false, reason: "RESEND_NOT_CONFIGURED" };
   if (!email) return { sent: false, reason: "NO_EMAIL" };
-  const from = env.EMAIL_FROM || "AgriMan <onboarding@resend.dev>";
+
   const text = [
     "Welcome to AgriMan!",
     "",
@@ -281,41 +340,34 @@ async function sendWelcomeEmail(env, { email, farmerId, password }) {
 <p><a href="https://agriman.agribakr.workers.dev/">Open AgriMan</a></p>
 <p style="color:#6d6458;font-size:14px;">Keep these credentials safe. Anyone with your FarmerID and password can access your farms.</p>
 </body></html>`;
-  const body = {
-    from,
-    to: [email],
-    subject: "Your AgriMan FarmerID and password",
-    text,
-    html,
-  };
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${apiKey}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      const detail = await res.text();
-      return { sent: false, reason: detail.slice(0, 300) };
-    }
-    return { sent: true };
-  } catch (e) {
-    return { sent: false, reason: String(e?.message || e) };
-  }
-}
+  const subject = "Your AgriMan FarmerID and password";
 
-function isValidEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const primary = String(env.EMAIL_FROM || DEFAULT_EMAIL_FROM).trim() || DEFAULT_EMAIL_FROM;
+  const fallback = String(env.EMAIL_FROM_FALLBACK || DEFAULT_EMAIL_FROM).trim() || DEFAULT_EMAIL_FROM;
+  const fromCandidates = primary === fallback ? [primary] : [primary, fallback];
+
+  let lastReason = "";
+  for (const from of fromCandidates) {
+    const result = await resendSend(apiKey, { from, to: email, subject, text, html });
+    if (result.sent) return { sent: true, from_used: from };
+    lastReason = result.reason || result.raw || "SEND_FAILED";
+    if (from === fallback || !shouldTryFallbackFrom(lastReason)) break;
+  }
+  return { sent: false, reason: lastReason };
 }
 
 async function handleHealth(env) {
   if (!env.DB) return json({ ok: false, error: "DB_NOT_BOUND" }, 503);
   try {
     await ensureSchema(env.DB);
-    return json({ ok: true, provider: "cloudflare-d1", version: 2, email_ready: Boolean(env.RESEND_API_KEY) });
+    const from = String(env.EMAIL_FROM || DEFAULT_EMAIL_FROM).trim() || DEFAULT_EMAIL_FROM;
+    return json({
+      ok: true,
+      provider: "cloudflare-d1",
+      version: 2,
+      email_ready: Boolean(env.RESEND_API_KEY),
+      email_from: from.includes("@") ? from : DEFAULT_EMAIL_FROM,
+    });
   } catch (e) {
     return json({ ok: false, error: "DB_ERROR", detail: String(e) }, 503);
   }
@@ -326,6 +378,7 @@ async function handleFarmerRegister(env, body) {
   const email = String(body?.email || "").trim().toLowerCase() || null;
   if (password.length < 6) return err("WEAK_PASSWORD");
   if (!email) return err("EMAIL_REQUIRED");
+  if (BLOCKED_EMAIL_DOMAINS.has(emailDomain(email))) return err("EMAIL_DOMAIN_BLOCKED");
   if (!isValidEmail(email)) return err("INVALID_EMAIL");
 
   await ensureSchema(env.DB);
