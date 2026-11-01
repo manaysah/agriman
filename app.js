@@ -572,7 +572,8 @@
     if (data?.email_sent) return t("emailSent");
     const status = String(data?.email_status || "");
     if (status.includes("only send testing emails")) return t("emailResendTestingOnly");
-    if (status.includes("verify a domain") || status.includes("not verified")) return t("emailNeedDomain");
+    if (status.includes("RESEND_DOMAIN_NOT_VERIFIED") || status.includes("verify a domain") || status.includes("not verified"))
+      return t("emailNeedDomain");
     if (status.includes("RESEND_NOT_CONFIGURED")) return t("emailNotSent");
     return t("emailNotSent");
   }

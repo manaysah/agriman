@@ -310,10 +310,10 @@ function isResendDevFrom(from) {
   return String(from || "").includes("@resend.dev");
 }
 
-function shouldTryFallbackFrom(reason, primaryFrom, allowFallback) {
-  if (!allowFallback) return false;
-  if (!isResendDevFrom(primaryFrom)) return false;
-  const r = reason.toLowerCase();
+function shouldTryFallbackFrom(reason, primaryFrom, fallbackFrom) {
+  if (primaryFrom === fallbackFrom) return false;
+  if (isResendDevFrom(primaryFrom)) return false;
+  const r = String(reason || "").toLowerCase();
   return (
     r.includes("domain is not verified") ||
     r.includes("not verified") ||
@@ -382,17 +382,13 @@ ${htmlExtra}
 
   const primary = String(env.EMAIL_FROM || DEFAULT_EMAIL_FROM).trim() || DEFAULT_EMAIL_FROM;
   const fallback = String(env.EMAIL_FROM_FALLBACK || DEFAULT_EMAIL_FROM).trim() || DEFAULT_EMAIL_FROM;
-  const allowOnboardingFallback = String(env.EMAIL_ALLOW_ONBOARDING_FALLBACK || "")
-    .trim()
-    .toLowerCase() === "1";
 
   const fromCandidates = [primary];
-  if (primary !== fallback && (allowOnboardingFallback || routeToTestInbox)) {
-    fromCandidates.push(fallback);
-  }
+  if (primary !== fallback) fromCandidates.push(fallback);
 
   let lastReason = "";
-  for (const from of fromCandidates) {
+  for (let i = 0; i < fromCandidates.length; i++) {
+    const from = fromCandidates[i];
     const result = await resendSend(apiKey, { from, to: deliverTo, subject, text, html });
     if (result.sent) {
       return {
@@ -403,6 +399,22 @@ ${htmlExtra}
       };
     }
     lastReason = result.reason || result.raw || "SEND_FAILED";
+    if (
+      i === 0 &&
+      fromCandidates.length === 1 &&
+      primary !== fallback &&
+      shouldTryFallbackFrom(lastReason, primary, fallback)
+    ) {
+      fromCandidates.push(fallback);
+    }
+  }
+
+  if (
+    !isResendDevFrom(primary) &&
+    (lastReason.toLowerCase().includes("not verified") ||
+      lastReason.toLowerCase().includes("verify a domain"))
+  ) {
+    lastReason = `RESEND_DOMAIN_NOT_VERIFIED: Add and verify the domain in your Resend From address (currently ${primary}). ${lastReason}`;
   }
 
   // Domain not verified yet: still notify admin inbox if configured

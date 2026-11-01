@@ -34,6 +34,16 @@ https://agriman.agribakr.workers.dev/api/farm/health → `"email_ready": true`, 
 
 The Worker tries **`EMAIL_FROM`**, then falls back to **`onboarding@resend.dev`** if the primary domain is not verified yet.
 
+### 403 in Resend logs
+
+| Log message | Cause | Fix |
+|-------------|--------|-----|
+| **domain is not verified** | `EMAIL_FROM` uses `@mail.agribak.com` but Resend shows that domain **Not verified** | Resend → Domains → `mail.agribak.com` → add all DNS records (DKIM/SPF). On Cloudflare, DNS-only (grey cloud) on Resend CNAMEs. Wait until **Verified**. |
+| **only send testing emails to your own email** | Fallback `onboarding@resend.dev` cannot mail arbitrary farmers | Same as above — verify `mail.agribak.com` so sends use `noreply@mail.agribak.com`. |
+| **from domain does not match** verified domain | Typo in `EMAIL_FROM` vs domain added in Resend | `wrangler.toml` must use the **exact** subdomain you verified (e.g. `noreply@mail.agribak.com`, not `@agribak.com`). |
+
+After DNS verifies, redeploy is automatic on push to `main`. Register again and check Resend → Logs.
+
 ### 3. Production sender (live farmers)
 
 1. [resend.com/domains](https://resend.com/domains) → **Add** → `mail.agribak.com`
