@@ -54,6 +54,14 @@ function generateFarmerId() {
   return `Agri-${String(n).padStart(4, "0")}`;
 }
 
+function generateTempPassword(length = 10) {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  const bytes = crypto.getRandomValues(new Uint8Array(length));
+  let out = "";
+  for (let i = 0; i < length; i++) out += alphabet[bytes[i] % alphabet.length];
+  return out;
+}
+
 async function generateUniqueFarmerId(db) {
   for (let i = 0; i < 24; i++) {
     const farmerId = generateFarmerId();
@@ -526,6 +534,10 @@ async function handleHealth(env) {
       email_brevo: Boolean(env.BREVO_API_KEY),
       email_test_to: Boolean(String(env.EMAIL_TEST_TO || "").trim()),
       admin_ready: adminConfigured(env),
+      admin_username: String(env.ADMIN_USERNAME || "admin").trim(),
+      admin_setup: adminConfigured(env)
+        ? null
+        : "Add encrypted secret ADMIN_PASSWORD (min 8 chars) on Worker agriman, or: npx wrangler secret put ADMIN_PASSWORD",
     });
   } catch (e) {
     return json({ ok: false, error: "DB_ERROR", detail: String(e) }, 503);
@@ -871,6 +883,12 @@ async function handleAdminFarmersExport(env, body) {
   });
 }
 
+async function deleteFarmerById(db, farmerId) {
+  await db.prepare(`DELETE FROM farmer_sessions WHERE farmer_id = ?`).bind(farmerId).run();
+  await db.prepare(`DELETE FROM crop_farms WHERE farmer_id = ?`).bind(farmerId).run();
+  await db.prepare(`DELETE FROM farmers WHERE farmer_id = ?`).bind(farmerId).run();
+}
+
 async function handleAdminFarmersDelete(env, body) {
   const auth = await requireAdmin(env, body);
   if (auth.error) return auth.error;
@@ -880,10 +898,63 @@ async function handleAdminFarmersDelete(env, body) {
     .bind(farmerId)
     .first();
   if (!row) return err("NOT_FOUND", 404);
-  await env.DB.prepare(`DELETE FROM farmer_sessions WHERE farmer_id = ?`).bind(farmerId).run();
-  await env.DB.prepare(`DELETE FROM crop_farms WHERE farmer_id = ?`).bind(farmerId).run();
-  await env.DB.prepare(`DELETE FROM farmers WHERE farmer_id = ?`).bind(farmerId).run();
+  await deleteFarmerById(env.DB, farmerId);
   return json({ deleted: farmerId });
+}
+
+async function handleAdminFarmersDeleteBulk(env, body) {
+  const auth = await requireAdmin(env, body);
+  if (auth.error) return auth.error;
+  const raw = body?.farmer_ids || body?.farmerIds || [];
+  if (!Array.isArray(raw) || !raw.length) return err("BAD_FARMER_LIST", 400);
+  if (raw.length > 500) return err("TOO_MANY", 400);
+
+  const ids = [...new Set(raw.map((id) => canonicalFarmerId(id)).filter(Boolean))];
+  if (!ids.length) return err("BAD_FARMER_LIST", 400);
+
+  let deleted = 0;
+  const notFound = [];
+  for (const farmerId of ids) {
+    const row = await env.DB.prepare(`SELECT farmer_id FROM farmers WHERE farmer_id = ?`)
+      .bind(farmerId)
+      .first();
+    if (!row) {
+      notFound.push(farmerId);
+      continue;
+    }
+    await deleteFarmerById(env.DB, farmerId);
+    deleted++;
+  }
+  return json({ deleted, not_found: notFound, requested: ids.length });
+}
+
+async function handleAdminFarmersResetPassword(env, body) {
+  const auth = await requireAdmin(env, body);
+  if (auth.error) return auth.error;
+  const farmerId = canonicalFarmerId(body?.farmer_id || body?.farmerId);
+  if (!farmerId) return err("BAD_FARMER", 400);
+
+  const row = await env.DB.prepare(`SELECT farmer_id, email FROM farmers WHERE farmer_id = ?`)
+    .bind(farmerId)
+    .first();
+  if (!row) return err("NOT_FOUND", 404);
+
+  const password = generateTempPassword(10);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const passwordHash = await hashPassword(password, salt);
+  await env.DB.prepare(
+    `UPDATE farmers SET password_salt = ?, password_hash = ? WHERE farmer_id = ?`
+  )
+    .bind(b64(salt), passwordHash, farmerId)
+    .run();
+  await env.DB.prepare(`DELETE FROM farmer_sessions WHERE farmer_id = ?`).bind(farmerId).run();
+
+  return json({
+    farmer_id: farmerId,
+    email: row.email || null,
+    password,
+    note: "Original password cannot be recovered (stored as a hash). This is a new password.",
+  });
 }
 
 async function handleApi(request, env) {
@@ -939,6 +1010,10 @@ async function handleApi(request, env) {
     if (parts[1] === "farmers" && parts[2] === "list") return handleAdminFarmersList(env, body);
     if (parts[1] === "farmers" && parts[2] === "export") return handleAdminFarmersExport(env, body);
     if (parts[1] === "farmers" && parts[2] === "delete") return handleAdminFarmersDelete(env, body);
+    if (parts[1] === "farmers" && parts[2] === "delete-bulk")
+      return handleAdminFarmersDeleteBulk(env, body);
+    if (parts[1] === "farmers" && parts[2] === "reset-password")
+      return handleAdminFarmersResetPassword(env, body);
     return err("NOT_FOUND", 404);
   }
 

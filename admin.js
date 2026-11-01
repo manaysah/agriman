@@ -1,5 +1,6 @@
 (() => {
   const ADMIN_SESSION = "agriman-admin-session-v1";
+  let credFarmerId = null;
 
   function loadSession() {
     try {
@@ -41,6 +42,22 @@
 
   const $ = (sel) => document.querySelector(sel);
 
+  function selectedFarmerIds() {
+    return [...document.querySelectorAll(".admin-farmer-cb:checked")].map((el) => el.value);
+  }
+
+  function updateBulkDeleteState() {
+    const n = selectedFarmerIds().length;
+    const btn = $("#adminBulkDeleteBtn");
+    if (btn) btn.disabled = n === 0;
+    const all = $("#adminSelectAll");
+    const boxes = document.querySelectorAll(".admin-farmer-cb");
+    if (all && boxes.length) {
+      all.checked = n > 0 && n === boxes.length;
+      all.indeterminate = n > 0 && n < boxes.length;
+    }
+  }
+
   async function refreshList() {
     const session = loadSession();
     if (!session?.token) return showLogin();
@@ -49,20 +66,29 @@
     const farmers = data.farmers || [];
     if (!farmers.length) {
       list.innerHTML = `<li class="empty">No farmers registered.</li>`;
+      updateBulkDeleteState();
       return;
     }
     list.innerHTML = farmers
       .map(
         (f) => `
-      <li class="record-item">
+      <li class="record-item admin-farmer-row">
+        <label class="admin-farmer-check">
+          <input type="checkbox" class="admin-farmer-cb" value="${escapeHtml(f.farmer_id)}" />
+        </label>
         <span class="title">${escapeHtml(f.farmer_id)}</span>
         <span class="meta">${escapeHtml(f.email || "—")} · ${escapeHtml(f.created_at || "")} · ${f.farm_count || 0} farms</span>
         <div class="actions">
+          <button type="button" data-cred-farmer="${escapeHtml(f.farmer_id)}" data-cred-email="${escapeHtml(f.email || "")}">Credentials</button>
           <button type="button" data-del-farmer="${escapeHtml(f.farmer_id)}">Delete</button>
         </div>
       </li>`
       )
       .join("");
+    list.querySelectorAll(".admin-farmer-cb").forEach((cb) => {
+      cb.addEventListener("change", updateBulkDeleteState);
+    });
+    updateBulkDeleteState();
   }
 
   function escapeHtml(str) {
@@ -71,6 +97,27 @@
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;");
+  }
+
+  async function copyText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function openCredDialog(farmerId, email) {
+    credFarmerId = farmerId;
+    $("#adminCredFarmerId").value = farmerId;
+    $("#adminCredEmail").textContent = email ? `Email: ${email}` : "No email on file";
+    $("#adminCredPassword").value = "";
+    $("#adminCredPassword").placeholder = "Generate a new password to display";
+    $("#adminCredNote").textContent =
+      "Original signup password cannot be recovered (stored as a hash).";
+    $("#adminCopyPassword").disabled = true;
+    $("#adminCredDialog").showModal();
   }
 
   $("#adminLoginForm").addEventListener("submit", async (e) => {
@@ -114,7 +161,77 @@
     URL.revokeObjectURL(a.href);
   });
 
+  $("#adminSelectAll").addEventListener("change", (e) => {
+    const checked = e.target.checked;
+    document.querySelectorAll(".admin-farmer-cb").forEach((cb) => {
+      cb.checked = checked;
+    });
+    updateBulkDeleteState();
+  });
+
+  $("#adminBulkDeleteBtn").addEventListener("click", async () => {
+    const ids = selectedFarmerIds();
+    if (!ids.length) return;
+    if (
+      !confirm(
+        `Delete ${ids.length} farmer(s) and all their farms? This cannot be undone.\n\n${ids.slice(0, 8).join("\n")}${ids.length > 8 ? `\n…and ${ids.length - 8} more` : ""}`
+      )
+    ) {
+      return;
+    }
+    const session = loadSession();
+    try {
+      const result = await api("farmers/delete-bulk", { token: session.token, farmer_ids: ids });
+      if (result.not_found?.length) {
+        alert(`Deleted ${result.deleted}. Not found: ${result.not_found.join(", ")}`);
+      }
+      await refreshList();
+    } catch {
+      alert("Bulk delete failed.");
+    }
+  });
+
+  $("#adminCopyFarmerId").addEventListener("click", async () => {
+    const ok = await copyText($("#adminCredFarmerId").value);
+    if (!ok) alert("Copy failed.");
+  });
+
+  $("#adminCopyPassword").addEventListener("click", async () => {
+    const pw = $("#adminCredPassword").value;
+    if (!pw) return;
+    const ok = await copyText(pw);
+    if (!ok) alert("Copy failed.");
+  });
+
+  $("#adminResetPasswordBtn").addEventListener("click", async () => {
+    if (!credFarmerId) return;
+    if (
+      !confirm(
+        `Set a new random password for ${credFarmerId}? The farmer's old password will stop working.`
+      )
+    ) {
+      return;
+    }
+    const session = loadSession();
+    try {
+      const data = await api("farmers/reset-password", {
+        token: session.token,
+        farmer_id: credFarmerId,
+      });
+      $("#adminCredPassword").value = data.password || "";
+      $("#adminCopyPassword").disabled = !data.password;
+      $("#adminCredNote").textContent = data.note || "New password set.";
+    } catch {
+      alert("Could not reset password.");
+    }
+  });
+
   document.addEventListener("click", async (e) => {
+    const credBtn = e.target.closest("[data-cred-farmer]");
+    if (credBtn) {
+      openCredDialog(credBtn.dataset.credFarmer, credBtn.dataset.credEmail || "");
+      return;
+    }
     const btn = e.target.closest("[data-del-farmer]");
     if (!btn) return;
     const farmerId = btn.dataset.delFarmer;

@@ -124,4 +124,6 @@ Health: `"admin_ready": true` when `ADMIN_PASSWORD` is set.
 | `POST /api/admin/farmers/list` | all farmers (admin token) |
 | `POST /api/admin/farmers/export` | farmers + crop farms JSON |
 | `POST /api/admin/farmers/delete` | remove farmer by `farmer_id` |
+| `POST /api/admin/farmers/delete-bulk` | `{ farmer_ids: [] }` remove many farmers |
+| `POST /api/admin/farmers/reset-password` | set new random password (shown once; old hash not readable) |
 | `POST /api/farms/*` | multi-farm ledger |

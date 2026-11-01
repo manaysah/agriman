@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
-    <link rel="stylesheet" href="styles.css?v=6" />
+    <link rel="stylesheet" href="styles.css?v=7" />
     <title>AgriMan Admin</title>
   </head>
   <body>
@@ -44,10 +44,48 @@
               <button type="button" class="text-btn" id="adminRefreshBtn">Refresh</button>
             </div>
           </div>
-          <ul class="record-list" id="adminFarmerList"></ul>
+          <div class="admin-bulk-bar">
+            <label class="admin-select-all">
+              <input type="checkbox" id="adminSelectAll" />
+              Select all
+            </label>
+            <button type="button" class="ghost-btn admin-danger-btn" id="adminBulkDeleteBtn" disabled>
+              Delete selected
+            </button>
+          </div>
+          <p class="hint admin-list-hint">
+            Passwords are stored hashed and cannot be read. Use <strong>Credentials</strong> to copy FarmerID or set a new password to show once.
+          </p>
+          <ul class="record-list admin-farmer-list" id="adminFarmerList"></ul>
         </div>
       </main>
     </div>
-    <script src="admin.js?v=1"></script>
+
+    <dialog id="adminCredDialog" class="admin-dialog">
+      <form method="dialog" id="adminCredForm">
+        <h3>Farmer credentials</h3>
+        <p class="hint" id="adminCredEmail"></p>
+        <label class="admin-cred-field">
+          <span>FarmerID</span>
+          <div class="admin-cred-row">
+            <input type="text" id="adminCredFarmerId" readonly />
+            <button type="button" class="text-btn" id="adminCopyFarmerId">Copy</button>
+          </div>
+        </label>
+        <label class="admin-cred-field">
+          <span>Password</span>
+          <div class="admin-cred-row">
+            <input type="text" id="adminCredPassword" readonly placeholder="Generate a new password to display" />
+            <button type="button" class="text-btn" id="adminCopyPassword" disabled>Copy</button>
+          </div>
+        </label>
+        <p class="hint" id="adminCredNote">Original signup password cannot be recovered.</p>
+        <div class="admin-dialog-actions">
+          <button type="button" class="ghost-btn" id="adminResetPasswordBtn">Generate new password</button>
+          <button type="submit" class="primary-btn">Close</button>
+        </div>
+      </form>
+    </dialog>
+    <script src="admin.js?v=2"></script>
   </body>
 </html>

@@ -833,6 +833,95 @@ html[dir="rtl"] .auth-card h1 {
   padding: 12px 14px 32px;
 }
 
+.admin-bulk-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0 8px;
+}
+
+.admin-select-all {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.admin-danger-btn:not(:disabled) {
+  color: var(--danger, #9b3d2a);
+}
+
+.admin-list-hint {
+  margin-bottom: 12px;
+}
+
+.admin-farmer-list .admin-farmer-row {
+  grid-template-columns: auto 1fr;
+}
+
+.admin-farmer-check {
+  grid-row: 1 / span 3;
+  display: flex;
+  align-items: start;
+  padding-top: 4px;
+}
+
+.admin-farmer-check input {
+  width: 18px;
+  height: 18px;
+}
+
+.admin-dialog {
+  border: none;
+  border-radius: 12px;
+  padding: 0;
+  max-width: min(420px, calc(100vw - 32px));
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+}
+
+.admin-dialog form {
+  padding: 20px;
+}
+
+.admin-dialog h3 {
+  margin: 0 0 8px;
+}
+
+.admin-cred-field {
+  display: block;
+  margin: 12px 0;
+}
+
+.admin-cred-field > span {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.admin-cred-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-cred-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
 .farm-grid {
   list-style: none;
   margin: 12px 0 0;
