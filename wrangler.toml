@@ -4,10 +4,12 @@ compatibility_date = "2024-11-12"
 account_id = "33b8081b03d586f1045d8f49d71d5dff"
 
 [vars]
-# Resend: use onboarding@ until agribak.com shows Verified at resend.com/domains, then switch:
-# EMAIL_FROM = "AgriMan <hello@agribak.com>"
+# Testing with onboarding@resend.dev: route all welcome mail to your Resend login inbox.
+EMAIL_TEST_TO = "mhmd.manaysah@gmail.com"
 EMAIL_FROM = "AgriMan <onboarding@resend.dev>"
 EMAIL_FROM_FALLBACK = "AgriMan <onboarding@resend.dev>"
+# Production (after mail.agribak.com is Verified in Resend): remove EMAIL_TEST_TO, then:
+# EMAIL_FROM = "AgriMan <noreply@mail.agribak.com>"
 
 [assets]
 directory = "./"

@@ -323,6 +323,13 @@ async function sendWelcomeEmail(env, { email, farmerId, password }) {
   if (!apiKey) return { sent: false, reason: "RESEND_NOT_CONFIGURED" };
   if (!email) return { sent: false, reason: "NO_EMAIL" };
 
+  const testTo = String(env.EMAIL_TEST_TO || "").trim().toLowerCase();
+  const deliverTo = testTo && isValidEmail(testTo) ? testTo : email;
+  const overrideNote =
+    deliverTo !== email
+      ? `\n\n(Registered email on file: ${email}. Welcome mail routed to EMAIL_TEST_TO for Resend testing.)`
+      : "";
+
   const text = [
     "Welcome to AgriMan!",
     "",
@@ -332,11 +339,17 @@ async function sendWelcomeEmail(env, { email, farmerId, password }) {
     "Log in at https://agriman.agribakr.workers.dev/",
     "",
     "Keep these credentials safe. Anyone with your FarmerID and password can access your farms.",
+    overrideNote,
   ].join("\n");
+  const htmlExtra =
+    deliverTo !== email
+      ? `<p style="color:#6d6458;font-size:14px;">Registered email: ${escapeHtml(email)}</p>`
+      : "";
   const html = `<!DOCTYPE html><html><body style="font-family:system-ui,sans-serif;line-height:1.5;color:#1c1712">
 <p>Welcome to <strong>AgriMan</strong>!</p>
 <p><strong>FarmerID:</strong> ${escapeHtml(farmerId)}<br/>
 <strong>Password:</strong> ${escapeHtml(password)}</p>
+${htmlExtra}
 <p><a href="https://agriman.agribakr.workers.dev/">Open AgriMan</a></p>
 <p style="color:#6d6458;font-size:14px;">Keep these credentials safe. Anyone with your FarmerID and password can access your farms.</p>
 </body></html>`;
@@ -348,8 +361,15 @@ async function sendWelcomeEmail(env, { email, farmerId, password }) {
 
   let lastReason = "";
   for (const from of fromCandidates) {
-    const result = await resendSend(apiKey, { from, to: email, subject, text, html });
-    if (result.sent) return { sent: true, from_used: from };
+    const result = await resendSend(apiKey, { from, to: deliverTo, subject, text, html });
+    if (result.sent) {
+      return {
+        sent: true,
+        from_used: from,
+        delivered_to: deliverTo,
+        test_override: deliverTo !== email,
+      };
+    }
     lastReason = result.reason || result.raw || "SEND_FAILED";
     if (from === fallback || !shouldTryFallbackFrom(lastReason)) break;
   }
@@ -367,6 +387,7 @@ async function handleHealth(env) {
       version: 2,
       email_ready: Boolean(env.RESEND_API_KEY),
       email_from: from.includes("@") ? from : DEFAULT_EMAIL_FROM,
+      email_test_to: Boolean(String(env.EMAIL_TEST_TO || "").trim()),
     });
   } catch (e) {
     return json({ ok: false, error: "DB_ERROR", detail: String(e) }, 503);
