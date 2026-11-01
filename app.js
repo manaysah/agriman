@@ -576,6 +576,8 @@
     if (status.includes("RESEND_NOT_CONFIGURED")) return t("emailNotSent");
     return t("emailNotSent");
   }
+
+  function mapAuthError(err) {
     const msg = String(err?.code || err?.message || err || "");
     if (msg.includes("BAD_LOGIN")) return t("authErrorGeneric");
     if (msg.includes("FARM_EXISTS")) return "Farm ID already exists. Try again.";
