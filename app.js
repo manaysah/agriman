@@ -178,6 +178,7 @@
       syncLocal: "This device only",
       copied: "Copied",
       authErrorGeneric: "Could not sign in. Check FarmerID and password.",
+      authErrorNetwork: "Could not reach the server. Check mobile data or Wi‑Fi and try again.",
       farmCreated: "Account created. Your FarmerID:",
       settingsHint:
         "Cloud data is shared with anyone who has your FarmerID and password. Export a backup as extra safety.",
@@ -357,6 +358,7 @@
       syncLocal: "هذا الجهاز فقط",
       copied: "تم النسخ",
       authErrorGeneric: "تعذر الدخول. تحقق من المعرّف وكلمة المرور.",
+      authErrorNetwork: "تعذر الاتصال بالخادم. تحقق من الشبكة وحاول مرة أخرى.",
       farmCreated: "تم إنشاء المزرعة. شارك هذا المعرّف مع شريكك:",
       settingsHint:
         "بيانات المزرعة السحابية متاحة لمن لديه المعرّف وكلمة المرور. صدّر نسخة احتياطية للأمان الإضافي.",
@@ -472,9 +474,16 @@
     );
   }
 
+  function isLikelyCloudHost() {
+    if (location.protocol === "file:") return false;
+    const h = location.hostname;
+    return Boolean(h) && h !== "localhost";
+  }
+
   function cloudConfigured() {
     if (supabaseConfigured()) return true;
-    return cloudReady === true;
+    if (cloudReady === true) return true;
+    return isLikelyCloudHost();
   }
 
   function getSupabase() {
@@ -588,6 +597,9 @@
 
   function mapAuthError(err) {
     const msg = String(err?.code || err?.message || err || "");
+    if (msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("REQUEST_FAILED")) {
+      return t("authErrorNetwork");
+    }
     if (msg.includes("BAD_LOGIN")) return t("authErrorGeneric");
     if (msg.includes("FARM_EXISTS")) return "Farm ID already exists. Try again.";
     if (msg.includes("WEAK_PASSWORD")) return "Password must be at least 6 characters.";
@@ -704,7 +716,8 @@
     $("#app").classList.add("hidden");
     $("#farmsHub").classList.add("hidden");
     const configured = cloudConfigured();
-    $("#authSetupWarn").classList.toggle("hidden", configured);
+    const probeOk = cloudReady === true;
+    $("#authSetupWarn").classList.toggle("hidden", configured && probeOk);
     $("#authTabs").classList.toggle("hidden", !configured);
     $("#loginForm").classList.toggle("hidden", !configured);
     $("#registerForm").classList.add("hidden");
@@ -1677,6 +1690,7 @@
   $("#loginForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     $("#authError").classList.add("hidden");
+    await probeCloud();
     if (!cloudConfigured()) return showAuthError(t("cloudSetupNeeded"));
     const fd = new FormData(e.target);
     setAuthBusy(true);
@@ -1756,7 +1770,7 @@
     renderCalendar();
   });
 
-  const SHELL_VERSION = "6";
+  const SHELL_VERSION = "8";
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register(`./sw.js?v=${SHELL_VERSION}`).then((reg) => {
       reg.update();

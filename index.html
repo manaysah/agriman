@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <script>
       (function () {
-        var GEN = "6";
+        var GEN = "8";
         try {
           if (localStorage.getItem("agriman-shell-gen") === GEN) return;
           localStorage.setItem("agriman-shell-gen", GEN);
@@ -48,7 +48,7 @@
       href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&family=Literata:opsz,wght@7..72,500;7..72,700&family=Manrope:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="styles.css?v=6" />
+    <link rel="stylesheet" href="styles.css?v=8" />
     <title>AgriMan</title>
   </head>
   <body>
@@ -78,7 +78,16 @@
         <form id="loginForm" class="form auth-form">
           <label>
             <span data-i18n="farmerId">FarmerID</span>
-            <input type="text" name="farmerId" autocomplete="username" required placeholder="Agri-1234" />
+            <input
+              type="text"
+              name="farmerId"
+              autocomplete="username"
+              required
+              placeholder="Agri-1234"
+              autocapitalize="characters"
+              autocorrect="off"
+              spellcheck="false"
+            />
           </label>
           <label>
             <span data-i18n="password">Password</span>
@@ -555,7 +564,7 @@
 
     <input type="file" id="importFile" accept="application/json" hidden />
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="config.js?v=6"></script>
-    <script src="app.js?v=6"></script>
+    <script src="config.js?v=8"></script>
+    <script src="app.js?v=8"></script>
   </body>
 </html>
