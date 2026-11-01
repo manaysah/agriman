@@ -78,7 +78,7 @@
         <form id="loginForm" class="form auth-form">
           <label>
             <span data-i18n="farmerId">FarmerID</span>
-            <input type="text" name="farmerId" autocomplete="username" required placeholder="AgriBakMan-XXXXXX" />
+            <input type="text" name="farmerId" autocomplete="username" required placeholder="Agri-1234" />
           </label>
           <label>
             <span data-i18n="password">Password</span>
@@ -103,6 +103,8 @@
           </label>
           <button type="submit" class="primary-btn" data-i18n="register">Register</button>
         </form>
+
+        <p class="hint auth-admin-link"><a href="./admin.html">Admin</a></p>
 
         <p id="authError" class="auth-error hidden"></p>
         <p id="authBusy" class="hint hidden" data-i18n="pleaseWait">Please wait…</p>

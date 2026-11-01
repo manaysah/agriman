@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <link rel="stylesheet" href="styles.css?v=6" />
+    <title>AgriMan Admin</title>
+  </head>
+  <body>
+    <div id="adminLogin" class="auth-gate">
+      <div class="auth-card">
+        <h1>AgriMan Admin</h1>
+        <p class="hint">Manage registered farmers (requires ADMIN_PASSWORD on Worker).</p>
+        <form id="adminLoginForm" class="form auth-form">
+          <label>
+            <span>Username</span>
+            <input type="text" name="username" value="admin" autocomplete="username" required />
+          </label>
+          <label>
+            <span>Password</span>
+            <input type="password" name="password" autocomplete="current-password" required />
+          </label>
+          <button type="submit" class="primary-btn">Log in</button>
+        </form>
+        <p id="adminLoginError" class="auth-error hidden"></p>
+        <p class="hint"><a href="./">← Back to AgriMan</a></p>
+      </div>
+    </div>
+
+    <div id="adminApp" class="farms-hub hidden">
+      <header class="topbar">
+        <div class="brand-block">
+          <p class="brand">AgriMan Admin</p>
+        </div>
+        <button type="button" class="ghost-btn" id="adminLogoutBtn">Log out</button>
+      </header>
+      <main class="farms-hub-main">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Registered farmers</h2>
+            <div>
+              <button type="button" class="text-btn" id="adminExportBtn">Export JSON</button>
+              <button type="button" class="text-btn" id="adminRefreshBtn">Refresh</button>
+            </div>
+          </div>
+          <ul class="record-list" id="adminFarmerList"></ul>
+        </div>
+      </main>
+    </div>
+    <script src="admin.js?v=1"></script>
+  </body>
+</html>

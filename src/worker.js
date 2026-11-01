@@ -50,24 +50,32 @@ function newToken() {
 }
 
 function generateFarmerId() {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const bytes = crypto.getRandomValues(new Uint8Array(6));
-  let body = "";
-  for (let i = 0; i < 6; i++) body += alphabet[bytes[i] % alphabet.length];
-  return `AgriBakMan-${body}`;
+  const n = crypto.getRandomValues(new Uint16Array(1))[0] % 10000;
+  return `Agri-${String(n).padStart(4, "0")}`;
+}
+
+async function generateUniqueFarmerId(db) {
+  for (let i = 0; i < 24; i++) {
+    const farmerId = generateFarmerId();
+    const row = await db.prepare(`SELECT farmer_id FROM farmers WHERE farmer_id = ?`).bind(farmerId).first();
+    if (!row) return farmerId;
+  }
+  return null;
 }
 
 function generateCropFarmId() {
   return `F-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
 }
 
-/** Accept AgriBakMan-XXX or legacy AM-XXX (maps to AgriBakMan-XXX). */
+/** Agri-1234, legacy AgriBakMan-*, AM-* */
 function canonicalFarmerId(raw) {
-  const t = String(raw || "").trim();
+  let t = String(raw || "").trim();
   if (!t) return "";
   const u = t.toUpperCase();
   if (u.startsWith("AM-")) return `AgriBakMan-${u.slice(3)}`;
   if (u.startsWith("AGRIBAKMAN-")) return `AgriBakMan-${u.slice(11)}`;
+  const agri = u.match(/^AGRI-(\d{1,4})$/);
+  if (agri) return `Agri-${agri[1].padStart(4, "0")}`;
   return t;
 }
 
@@ -132,6 +140,16 @@ async function ensureSchema(db) {
       `CREATE TABLE IF NOT EXISTS app_meta (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
+      )`
+    )
+    .run();
+
+  await db
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS admin_sessions (
+        token TEXT PRIMARY KEY,
+        username TEXT NOT NULL,
+        expires_at TEXT NOT NULL
       )`
     )
     .run();
@@ -431,6 +449,7 @@ async function handleHealth(env) {
       email_ready: Boolean(env.RESEND_API_KEY),
       email_from: from.includes("@") ? from : DEFAULT_EMAIL_FROM,
       email_test_to: Boolean(String(env.EMAIL_TEST_TO || "").trim()),
+      admin_ready: adminConfigured(env),
     });
   } catch (e) {
     return json({ ok: false, error: "DB_ERROR", detail: String(e) }, 503);
@@ -447,37 +466,33 @@ async function handleFarmerRegister(env, body) {
 
   await ensureSchema(env.DB);
 
-  let farmerId = "";
-  let lastDetail = "";
-  for (let i = 0; i < 8; i++) {
-    farmerId = generateFarmerId();
-    const salt = crypto.getRandomValues(new Uint8Array(16));
-    const passwordHash = await hashPassword(password, salt);
-    const createdAt = new Date().toISOString();
-    try {
-      const insert = await env.DB.prepare(
-        `INSERT INTO farmers (farmer_id, password_salt, password_hash, email, phone, created_at)
-         VALUES (?, ?, ?, ?, NULL, ?)`
-      )
-        .bind(farmerId, b64(salt), passwordHash, email, createdAt)
-        .run();
-      if (!insert?.success) {
-        lastDetail = JSON.stringify(insert);
-        continue;
-      }
-      const token = await createFarmerSession(env.DB, farmerId);
-      const emailResult = await sendWelcomeEmail(env, { email, farmerId, password });
-      return json({
-        farmer_id: farmerId,
-        token,
-        email_sent: emailResult.sent === true,
-        email_status: emailResult.sent ? "sent" : emailResult.reason || "skipped",
-      });
-    } catch (e) {
-      lastDetail = String(e?.message || e);
+  const farmerId = await generateUniqueFarmerId(env.DB);
+  if (!farmerId) return json({ error: "REGISTER_FAILED", detail: "NO_ID" }, 500);
+
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const passwordHash = await hashPassword(password, salt);
+  const createdAt = new Date().toISOString();
+  try {
+    const insert = await env.DB.prepare(
+      `INSERT INTO farmers (farmer_id, password_salt, password_hash, email, phone, created_at)
+       VALUES (?, ?, ?, ?, NULL, ?)`
+    )
+      .bind(farmerId, b64(salt), passwordHash, email, createdAt)
+      .run();
+    if (!insert?.success) {
+      return json({ error: "REGISTER_FAILED", detail: JSON.stringify(insert) }, 500);
     }
+    const token = await createFarmerSession(env.DB, farmerId);
+    const emailResult = await sendWelcomeEmail(env, { email, farmerId, password });
+    return json({
+      farmer_id: farmerId,
+      token,
+      email_sent: emailResult.sent === true,
+      email_status: emailResult.sent ? "sent" : emailResult.reason || "skipped",
+    });
+  } catch (e) {
+    return json({ error: "REGISTER_FAILED", detail: String(e?.message || e) }, 500);
   }
-  return json({ error: "REGISTER_FAILED", detail: lastDetail }, 500);
 }
 
 async function handleFarmerLogin(env, body) {
@@ -705,6 +720,95 @@ async function handleLegacyFarmCreate(env, body) {
   });
 }
 
+async function sessionAdmin(db, token) {
+  if (!token) return null;
+  const sess = await db
+    .prepare(`SELECT token, username, expires_at FROM admin_sessions WHERE token = ?`)
+    .bind(token)
+    .first();
+  if (!sess) return null;
+  if (new Date(sess.expires_at).getTime() < Date.now()) {
+    await db.prepare(`DELETE FROM admin_sessions WHERE token = ?`).bind(token).run();
+    return null;
+  }
+  return sess;
+}
+
+async function createAdminSession(db, username) {
+  const token = newToken();
+  await db
+    .prepare(`INSERT INTO admin_sessions (token, username, expires_at) VALUES (?, ?, ?)`)
+    .bind(token, username, expiryIso(7))
+    .run();
+  return token;
+}
+
+function adminConfigured(env) {
+  return Boolean(String(env.ADMIN_PASSWORD || "").length >= 8);
+}
+
+async function handleAdminLogin(env, body) {
+  if (!adminConfigured(env)) return err("ADMIN_NOT_CONFIGURED", 503);
+  const username = String(body?.username || "admin").trim();
+  const password = String(body?.password || "");
+  const expectedUser = String(env.ADMIN_USERNAME || "admin").trim();
+  if (username !== expectedUser || password !== env.ADMIN_PASSWORD) {
+    return err("BAD_ADMIN_LOGIN", 401);
+  }
+  await ensureSchema(env.DB);
+  const token = await createAdminSession(env.DB, username);
+  return json({ token, username });
+}
+
+async function requireAdmin(env, body) {
+  const sess = await sessionAdmin(env.DB, body?.token);
+  if (!sess) return { error: err("BAD_ADMIN_SESSION", 401) };
+  return { sess };
+}
+
+async function handleAdminFarmersList(env, body) {
+  const auth = await requireAdmin(env, body);
+  if (auth.error) return auth.error;
+  const rows = await env.DB.prepare(
+    `SELECT f.farmer_id, f.email, f.phone, f.created_at,
+      (SELECT COUNT(*) FROM crop_farms c WHERE c.farmer_id = f.farmer_id) AS farm_count
+     FROM farmers f
+     ORDER BY f.created_at DESC`
+  ).all();
+  return json({ farmers: rows?.results || [] });
+}
+
+async function handleAdminFarmersExport(env, body) {
+  const auth = await requireAdmin(env, body);
+  if (auth.error) return auth.error;
+  const farmers = await env.DB.prepare(
+    `SELECT farmer_id, email, phone, created_at FROM farmers ORDER BY created_at DESC`
+  ).all();
+  const farms = await env.DB.prepare(
+    `SELECT farm_id, farmer_id, name, crop, started_at, updated_at FROM crop_farms ORDER BY updated_at DESC`
+  ).all();
+  return json({
+    exported_at: new Date().toISOString(),
+    farmers: farmers?.results || [],
+    crop_farms: farms?.results || [],
+  });
+}
+
+async function handleAdminFarmersDelete(env, body) {
+  const auth = await requireAdmin(env, body);
+  if (auth.error) return auth.error;
+  const farmerId = canonicalFarmerId(body?.farmer_id || body?.farmerId);
+  if (!farmerId) return err("BAD_FARMER", 400);
+  const row = await env.DB.prepare(`SELECT farmer_id FROM farmers WHERE farmer_id = ?`)
+    .bind(farmerId)
+    .first();
+  if (!row) return err("NOT_FOUND", 404);
+  await env.DB.prepare(`DELETE FROM farmer_sessions WHERE farmer_id = ?`).bind(farmerId).run();
+  await env.DB.prepare(`DELETE FROM crop_farms WHERE farmer_id = ?`).bind(farmerId).run();
+  await env.DB.prepare(`DELETE FROM farmers WHERE farmer_id = ?`).bind(farmerId).run();
+  return json({ deleted: farmerId });
+}
+
 async function handleApi(request, env) {
   const url = new URL(request.url);
   const path = url.pathname.replace(/^\/api\/?/, "").replace(/\/$/, "");
@@ -751,6 +855,16 @@ async function handleApi(request, env) {
     }
   }
 
+  if (parts[0] === "admin" && request.method === "POST") {
+    const body = await readJson(request);
+    if (!body) return err("BAD_JSON");
+    if (parts[1] === "login") return handleAdminLogin(env, body);
+    if (parts[1] === "farmers" && parts[2] === "list") return handleAdminFarmersList(env, body);
+    if (parts[1] === "farmers" && parts[2] === "export") return handleAdminFarmersExport(env, body);
+    if (parts[1] === "farmers" && parts[2] === "delete") return handleAdminFarmersDelete(env, body);
+    return err("NOT_FOUND", 404);
+  }
+
   if (parts[0] === "farm" && request.method === "POST") {
     const body = await readJson(request);
     if (!body) return err("BAD_JSON");
@@ -784,6 +898,8 @@ export default {
         const isShell =
           path === "/" ||
           path.endsWith("/index.html") ||
+          path.endsWith("/admin.html") ||
+          path.endsWith("/admin.js") ||
           path.endsWith("/app.js") ||
           path.endsWith("/styles.css") ||
           path.endsWith("/config.js") ||

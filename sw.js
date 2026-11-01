@@ -22,6 +22,8 @@ function isAppShellPath(pathname) {
   return (
     pathname.endsWith("/") ||
     pathname.endsWith("/index.html") ||
+    pathname.endsWith("/admin.html") ||
+    pathname.endsWith("/admin.js") ||
     pathname.endsWith("/app.js") ||
     pathname.endsWith("/styles.css") ||
     pathname.endsWith("/config.js") ||

@@ -115,7 +115,7 @@
       register: "Register",
       email: "Email",
       emailHint: "We’ll email your FarmerID and password to this address.",
-      registerHint: "We’ll create your FarmerID (AgriBakMan-…) and email your credentials.",
+      registerHint: "We’ll create your FarmerID (Agri-1234) and email your credentials.",
       farmerId: "FarmerID",
       yourFarmerId: "Your FarmerID",
       copyFarmerId: "Copy FarmerID",
@@ -226,7 +226,7 @@
       register: "تسجيل",
       email: "البريد",
       emailHint: "سنرسل FarmerID وكلمة المرور إلى هذا البريد.",
-      registerHint: "سنُنشئ FarmerID (AgriBakMan-…) ونرسل بيانات الدخول بالبريد.",
+      registerHint: "سنُنشئ FarmerID (Agri-1234) ونرسل بيانات الدخول بالبريد.",
       farmerId: "FarmerID",
       yourFarmerId: "FarmerID الخاص بك",
       copyFarmerId: "نسخ FarmerID",
@@ -671,7 +671,7 @@
       applyCloudData(data.data);
       session.updatedAt = data.updated_at;
       if (data.farmer_id) session.farmerId = data.farmer_id;
-      if (data.farm_id && !String(data.farm_id).startsWith("AgriBakMan")) {
+      if (data.farm_id && String(data.farm_id).startsWith("F-")) {
         session.cropFarmId = data.farm_id;
       }
       saveSession(session);

@@ -8,8 +8,8 @@ EMAIL_FROM = "AgriMan <noreply@mail.agribak.com>"
 EMAIL_FROM_FALLBACK = "AgriMan <onboarding@resend.dev>"
 # Until Resend shows mail.agribak.com Verified: copies welcome mail to your inbox when farmer mail fails.
 EMAIL_TEST_TO = "mhmd.manaysah@gmail.com"
-# Set to "1" only for legacy testing with onboarding@ as primary (not needed for production).
-# EMAIL_ALLOW_ONBOARDING_FALLBACK = "0"
+# Set via secret: npx wrangler secret put ADMIN_PASSWORD  (min 8 characters)
+ADMIN_USERNAME = "admin"
 
 [assets]
 directory = "./"

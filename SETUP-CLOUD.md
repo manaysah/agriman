@@ -76,11 +76,31 @@ Until then, with `onboarding@resend.dev`, Resend only delivers to **your Resend 
 - Register with your **real inbox** (same as Resend login until domain is verified)
 - Check spam; Resend **Logs** show accept/reject reasons
 
+## Admin panel
+
+URL: https://agriman.agribakr.workers.dev/admin.html
+
+1. Set Worker secret **`ADMIN_PASSWORD`** (at least 8 characters):
+   ```bash
+   npx wrangler secret put ADMIN_PASSWORD
+   ```
+   Or Cloudflare → agriman → Variables → encrypted **`ADMIN_PASSWORD`**.
+
+2. Optional var **`ADMIN_USERNAME`** in [wrangler.toml](wrangler.toml) (default `admin`).
+
+3. Log in → list farmers, **Export JSON**, **Delete** (removes farmer, farms, and sessions).
+
+Health: `"admin_ready": true` when `ADMIN_PASSWORD` is set.
+
 ## API overview
 
 | Route | Purpose |
 |-------|---------|
 | `GET /api/farm/health` | D1 + `email_ready` + `email_from` |
-| `POST /api/farmer/register` | email + password → welcome email |
+| `POST /api/farmer/register` | email + password → `Agri-####` + welcome email |
 | `POST /api/farmer/login` | FarmerID + password |
+| `POST /api/admin/login` | admin username + password |
+| `POST /api/admin/farmers/list` | all farmers (admin token) |
+| `POST /api/admin/farmers/export` | farmers + crop farms JSON |
+| `POST /api/admin/farmers/delete` | remove farmer by `farmer_id` |
 | `POST /api/farms/*` | multi-farm ledger |
